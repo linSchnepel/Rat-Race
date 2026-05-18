@@ -8,19 +8,22 @@
   "main": "dist/index.js",
   "scripts": {
     "start": "tsx src/index.ts",
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "build:run": "tsc && node dist/index.js",
+    "install:browser": "npx patchright install chrome",
+    "test": "echo \"No tests yet\" && exit 0",
+    "setup": "tsx scripts/setup-auth.ts"
   },
   "dependencies": {
     "chalk": "^5.6.2",
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.1",
-    "impit": "^0.13.1",
-    "patchright": "^1.59.4",
-    "tough-cookie": "^6.0.1",
-    "tsx": "^4.22.0",
+    "patchright": "latest",
     "typescript": "^6.0.3"
   },
   "devDependencies": {
-    "@types/node": "^25.8.0"
+    "@types/node": "^25.8.0",
+    "tsx": "^4.19.0"
   }
 }

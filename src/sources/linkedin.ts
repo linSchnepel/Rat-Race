@@ -1,4 +1,5 @@
 import { load } from 'cheerio';
+import type { Page } from 'patchright';
 import { getPage } from '../browser.js';
 import { normalizeCompany, normalizeTitle, normalizeLocation, normalizeUrl } from '../core/normalize.js';
 import { buildFingerprint } from '../core/fingerprint.js';
@@ -55,15 +56,38 @@ export async function fetchListingCards(searchUrl: string): Promise<JobCard[]> {
       timeout: 30_000,
     });
 
+    const landedUrl = page.url();
+    if (landedUrl.includes('/login') || landedUrl.includes('/authwall')) {
+      throw new Error(
+        `LinkedIn redirected to auth page (${landedUrl}). ` +
+        'Make sure your Chrome profile is logged in to LinkedIn and not open in another window.'
+      );
+    }
+    logger.debug(`Landed on: ${landedUrl}`);
+
     // Wait for at least one job card to appear.
     await page.waitForSelector(SELECTORS.cardContainer, { timeout: 15_000 }).catch(() => {
-      logger.warn('No job cards found within timeout — page may be empty or structure changed.');
+      logger.warn('No job cards found within timeout — page may be empty or selectors may need updating.');
     });
 
     // Scroll down to trigger lazy-loaded cards.
-    await autoScroll(page);
+    // Swallow scroll errors — a navigation mid-scroll is non-fatal; we just
+    // parse whatever content has loaded so far.
+    try {
+      await autoScroll(page);
+    } catch (err) {
+      logger.warn(`autoScroll interrupted: ${err instanceof Error ? err.message : String(err)}`);
+    }
 
-    const html = await page.content();
+    // page.content() can also throw if the page navigated away. Catch and
+    // return empty rather than crashing the whole poll cycle.
+    let html: string;
+    try {
+      html = await page.content();
+    } catch (err) {
+      logger.warn(`Could not capture page HTML: ${err instanceof Error ? err.message : String(err)}`);
+      return [];
+    }
     return parseListingCards(html);
   } finally {
     await page.close();
@@ -149,7 +173,7 @@ export async function hydrateCard(card: JobCard): Promise<JobRecord | null> {
     });
 
     const html = await page.content();
-    return await parseDetailPage(card, html);
+    return parseDetailPage(card, html);
   } catch (err) {
     logger.warn(`Hydration failed for ${card.url}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
@@ -277,17 +301,39 @@ function extractJobId(url: string): string | null {
 
 /**
  * Scroll down the page incrementally to trigger lazy-loaded cards.
+ *
+ * Re-reads scrollHeight on every tick so dynamically loaded content extending
+ * the page is accounted for. Caps at MAX_SCROLLS to prevent infinite loops on
+ * pages with true infinite scroll.
  */
-async function autoScroll(page: import('patchright').Page): Promise<void> {
-  await page.evaluate(async () => {
-    await new Promise<void>((resolve) => {
-      let totalHeight = 0;
-      const distance = 400;
-      const timer = setInterval(() => {
-        // TODO: scroll
-      }, 150);
-    });
-  });
-  // Brief pause after scrolling to let any lazy content settle.
-  await new Promise((r) => setTimeout(r, 1_000));
+async function autoScroll(page: Page): Promise<void> {
+  const MAX_SCROLLS = 20;
+  const SCROLL_DISTANCE = 600;
+  const TICK_MS = 200;
+
+  for (let i = 0; i < MAX_SCROLLS; i++) {
+    let reachedBottom: boolean;
+
+    try {
+      reachedBottom = await page.evaluate((distance: number) => {
+        window.scrollBy(0, distance);
+        return window.scrollY + window.innerHeight >= document.body.scrollHeight - 100;
+      }, SCROLL_DISTANCE);
+    } catch (err) {
+      // Execution context destroyed = page navigated mid-scroll. Not fatal —
+      // just stop scrolling and let the caller capture whatever loaded.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('context was destroyed') || msg.includes('Target closed')) {
+        logger.debug('Page navigated during scroll — stopping early.');
+        return;
+      }
+      throw err;
+    }
+
+    if (reachedBottom) break;
+
+    await page.waitForTimeout(TICK_MS);
+  }
+
+  await page.waitForTimeout(800);
 }

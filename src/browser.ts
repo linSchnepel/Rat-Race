@@ -1,30 +1,42 @@
 import { chromium, BrowserContext, Page } from 'patchright';
+import { existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const AUTH_FILE = join(__dirname, '../data/auth.json');
 
 let context: BrowserContext | null = null;
 
 export interface BrowserOptions {
-  liAt: string;
   headless?: boolean;
   timezone?: string;
   locale?: string;
 }
 
 /**
- * Launch a Patchright-patched Chrome instance and inject the li_at session
- * cookie. Must be called before getPage() or verifySession().
+ * Launch a Patchright Chrome instance using saved storageState from
+ * scripts/setup-auth.ts. This sidesteps the Windows DPAPI cookie encryption
+ * problem — we use a plaintext session file rather than Chrome's locked DB.
+ *
+ * Run `npx tsx scripts/setup-auth.ts` whenever the session expires.
  */
-export async function initBrowser(opts: BrowserOptions): Promise<void> {
+export async function initBrowser(opts: BrowserOptions = {}): Promise<void> {
   if (context) {
     throw new Error('Browser already initialized. Call closeBrowser() first.');
   }
 
+  if (!existsSync(AUTH_FILE)) {
+    throw new Error(
+      `Auth file not found at ${AUTH_FILE}. ` +
+        'Run `npx tsx scripts/setup-auth.ts` first to log in and save your session.'
+    );
+  }
+
   const browser = await chromium.launch({
-    // channel: 'chrome' uses the locally installed Chrome binary, which has a
-    // real fingerprint. Falls back to bundled Chromium if Chrome is absent.
     channel: 'chrome',
     headless: opts.headless ?? true,
     args: [
-      // Belt-and-suspenders alongside Patchright's own flag patches.
       '--disable-blink-features=AutomationControlled',
       '--no-first-run',
       '--no-default-browser-check',
@@ -32,49 +44,18 @@ export async function initBrowser(opts: BrowserOptions): Promise<void> {
   });
 
   context = await browser.newContext({
+    storageState: AUTH_FILE,
     viewport: { width: 1440, height: 900 },
     locale: opts.locale ?? 'en-US',
     timezoneId: opts.timezone ?? 'America/Chicago',
-    userAgent:
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-      'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-      'Chrome/124.0.0.0 Safari/537.36',
-    extraHTTPHeaders: {
-      'accept-language': 'en-US,en;q=0.9',
-      'sec-ch-ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-      'sec-ch-ua-mobile': '?0',
-      'sec-ch-ua-platform': '"Windows"',
-    },
+    // No custom userAgent — let Patchright use the real Chrome UA so it
+    // matches what LinkedIn saw when you logged in during setup.
   });
-
-  // Navigate to LinkedIn's domain first so the browser establishes the origin
-  // before we set cookies. Without this, some Chromium builds silently drop
-  // cookies set on domains that have never been visited in this context.
-  const seedPage = await context.newPage();
-  await seedPage.goto('https://www.linkedin.com', {
-    waitUntil: 'domcontentloaded',
-    timeout: 30_000,
-  });
-  await seedPage.close();
-
-  // li_at is SameSite=Lax in LinkedIn's real cookie — match that exactly.
-  // Using 'None' here causes Chromium to silently reject it in some configs.
-  await context.addCookies([
-    {
-      name: 'li_at',
-      value: opts.liAt,
-      domain: '.linkedin.com',
-      path: '/',
-      httpOnly: true,
-      secure: true,
-      sameSite: 'Lax',
-    },
-  ]);
 }
 
 /**
- * Open a new Page inside the existing browser context.
- * The li_at cookie is already present — no further setup needed.
+ * Open a new Page inside the browser context.
+ * Session is already loaded from auth.json — no further setup needed.
  */
 export async function getPage(): Promise<Page> {
   if (!context) {
@@ -105,9 +86,6 @@ export async function closeBrowser(): Promise<void> {
   }
 }
 
-/**
- * True if initBrowser() has been called and closeBrowser() has not.
- */
 export function isBrowserOpen(): boolean {
   return context !== null;
 }

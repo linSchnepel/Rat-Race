@@ -20,21 +20,11 @@ const SESSION_TTL_MS = 60 * 60 * 1000;
  * refresh their LINKEDIN_LI_AT cookie.
  */
 export async function ensureLinkedInSession(): Promise<void> {
-  const liAt = process.env['LINKEDIN_LI_AT'];
-  if (!liAt) {
-    throw new Error(
-      'LINKEDIN_LI_AT is not set. ' +
-        'Copy your li_at cookie from Chrome DevTools → Application → Cookies → linkedin.com.'
-    );
-  }
-
   const state = await loadSessionState();
-  const cookieHash = hashCookie(liAt);
 
-  // Skip re-verification if cookie hasn't changed and TTL is still valid.
+  // Skip re-verification if we checked recently.
   if (
     state.lastVerified !== null &&
-    state.cookieHash === cookieHash &&
     Date.now() - state.lastVerified < SESSION_TTL_MS
   ) {
     logger.debug('Session still valid (within TTL). Skipping re-verification.');
@@ -46,7 +36,7 @@ export async function ensureLinkedInSession(): Promise<void> {
 
   await saveSessionState({
     lastVerified: Date.now(),
-    cookieHash,
+    cookieHash: null,
   });
 
   logger.info('Session verified successfully.');

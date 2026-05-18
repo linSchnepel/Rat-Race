@@ -1,2 +1,10 @@
-node_modules
+node_modules/
+dist/
 .env
+
+# Session state — contains auth cookies, do not commit
+data/auth.json
+
+# Job history and runtime state — optionally gitignore these too
+# data/jobs.jsonl
+# data/state.json

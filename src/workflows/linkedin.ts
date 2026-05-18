@@ -11,26 +11,17 @@ import type { JobRecord } from '../core/types.js';
 
 const POLL_INTERVAL_MS = parseInt(process.env['POLL_INTERVAL_MS'] ?? '600000', 10);
 const SEARCH_URL = process.env['LINKEDIN_SEARCH_URL'] ?? '';
-console.log(SEARCH_URL);
 
 export async function runLinkedInWorkflow(): Promise<void> {
   if (!SEARCH_URL) {
     throw new Error('LINKEDIN_SEARCH_URL is not set in your environment.');
   }
 
-  const liAt = process.env['LINKEDIN_LI_AT'];
-  if (!liAt) {
-    throw new Error(
-      'LINKEDIN_LI_AT is not set. ' +
-        'Copy your li_at cookie from DevTools → Application → Cookies → linkedin.com.'
-    );
-  }
-
   logger.info('Starting LinkedIn job scout…');
 
-  // Initialize Patchright browser with the session cookie.
+  // Initialize Patchright browser with the persistent Chrome profile.
+  // Authentication comes from the profile's existing session — no cookie needed.
   await initBrowser({
-    liAt,
     headless: process.env['HEADLESS'] !== 'false',
     timezone: process.env['TZ'] ?? 'America/Chicago',
   });
@@ -40,7 +31,13 @@ export async function runLinkedInWorkflow(): Promise<void> {
     await ensureLinkedInSession();
 
     // Run once immediately, then on the poll interval.
-    await runOnce();
+    // Catch here so a bad first run doesn't kill the process — it will retry
+    // on the next poll cycle just like any other failure.
+    try {
+      await runOnce();
+    } catch (err) {
+      logger.error('Initial poll cycle failed — will retry on next interval', err);
+    }
 
     logger.info(`Polling every ${POLL_INTERVAL_MS / 1000}s. Press Ctrl+C to stop.`);
     const timer = setInterval(async () => {
