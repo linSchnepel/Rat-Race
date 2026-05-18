@@ -1,0 +1,26 @@
+{
+  "name": "rat-race",
+  "version": "1.0.0",
+  "description": "despair",
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "E. Lin Schnepel",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.4.1",
+    "impit": "^0.13.1",
+    "patchright": "^1.59.4",
+    "tough-cookie": "^6.0.1",
+    "tsx": "^4.22.0",
+    "typescript": "^6.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0"
+  }
+}
