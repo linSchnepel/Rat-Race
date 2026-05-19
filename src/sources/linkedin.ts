@@ -4,99 +4,161 @@ import { getPage } from '../browser.js';
 import { normalizeCompany, normalizeTitle, normalizeLocation, normalizeUrl } from '../core/normalize.js';
 import { buildFingerprint } from '../core/fingerprint.js';
 import { matchSkills } from '../core/skills.js';
-import { nowIso } from '../utils/dates.js';
+import { nowIso, randomDelay } from '../utils/dates.js';
 import { logger } from '../utils/logger.js';
 import type { JobCard, JobRecord } from '../core/types.js';
 
 // ---------------------------------------------------------------------------
-// Selectors — LinkedIn's class names as of 2025. If scraping breaks, check
-// these first in DevTools before changing logic.
+// Selectors — LinkedIn authenticated SRP as of 2026.
 // ---------------------------------------------------------------------------
 
 const SELECTORS = {
-  // Listing page
-  cardContainer: 'div.job-search-card, div.base-card',
-  cardTitle: 'h3.base-search-card__title',
-  cardCompany: 'h4.base-search-card__subtitle',
-  cardLocation: 'span.job-search-card__location',
-  cardLink: 'a.base-card__full-link',
-  cardTeaser: 'p.job-search-card__snippet',
-  cardDate: 'time.job-search-card__listdate, time.job-search-card__listdate--new',
-  easyApplyBadge: 'span.job-search-card__easy-apply-label',
-  promotedBadge: 'span.job-search-card__promoted-text',
+  // Left panel — job card list
+  cardContainer:  'li[data-occludable-job-id]',
+  cardLink:       'a.job-card-container__link',
+  cardTitle:      'a.job-card-list__title--link strong',
+  cardCompany:    'div.artdeco-entity-lockup__subtitle span',
+  cardLocation:   'div.artdeco-entity-lockup__caption li span',
+  easyApplyBadge: 'ul.job-card-list__footer-wrapper li span',
 
-  // Detail page
-  detailTitle: 'h1.top-card-layout__title, h1.t-24',
-  detailCompany: 'a.topcard__org-name-link, span.topcard__flavor:first-child',
-  detailLocation: 'span.topcard__flavor--bullet, .jobs-unified-top-card__bullet',
-  detailDescription: 'div.show-more-less-html__markup, div.description__text',
-  detailEmploymentType: 'span.description__job-criteria-text:nth-of-type(1)',
-  detailExperienceLevel: 'span.description__job-criteria-text:nth-of-type(2)',
-  detailApplicants: 'span.num-applicants__caption, figcaption.num-applicants__caption',
-  detailPostedAge: 'span.posted-time-ago__text, span.topcard__flavor--metadata',
-  easyApplyButton: 'button.jobs-apply-button--top-card, span.jobs-apply-button__text',
+  // Right panel — job detail pane (loaded when a card is clicked)
+  detailPanel:       'div.jobs-search__job-details--wrapper',
+  detailTitle:       'div.job-details-jobs-unified-top-card__job-title h1',
+  detailCompany:     'div.job-details-jobs-unified-top-card__company-name',
+  detailMeta:        'div.job-details-jobs-unified-top-card__tertiary-description-container span.tvm__text',
+  detailPills:       'div.job-details-fit-level-preferences button span',
+  detailDescription: 'div#job-details',
+  easyApplyButton:   'button.jobs-apply-button[data-job-id]',
+  detailApplyLink:   'a.jobs-apply-button--top-card, a[data-tracking-control-name*="apply"]',
+  repostedSignal:    'div.job-details-jobs-unified-top-card__tertiary-description-container',
+
+  // Pagination
+  paginationNext: 'button.jobs-search-pagination__button--next',
 };
 
 // ---------------------------------------------------------------------------
-// Listing page — fetch cards
+// Main export: fetch ALL pages, hydrate each card on the listing page itself
 // ---------------------------------------------------------------------------
 
 /**
- * Navigate to the LinkedIn jobs search URL and parse all visible job cards.
- * Uses Patchright page navigation; Cheerio does all the parsing.
+ * Navigate to the LinkedIn jobs search URL, page through all results, and
+ * for each card click it to load the right-hand detail panel, then parse.
+ *
+ * Returns fully hydrated JobRecords — no separate hydration step needed.
+ * The workflow layer can skip hydrateCard() entirely.
  */
-export async function fetchListingCards(searchUrl: string): Promise<JobCard[]> {
+export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRecord[]> {
   const page = await getPage();
+  const allJobs: JobRecord[] = [];
 
   try {
-    logger.debug(`Navigating to listing page: ${searchUrl}`);
-
-    await page.goto(searchUrl, {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
-    });
+    logger.debug(`Navigating to search URL: ${searchUrl}`);
+    await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
     const landedUrl = page.url();
+    logger.info(`Landed on: ${landedUrl}`);
+
     if (landedUrl.includes('/login') || landedUrl.includes('/authwall')) {
+      const cookies = await page.context().cookies('https://www.linkedin.com');
+      const liAt = cookies.find((c) => c.name === 'li_at');
+      logger.warn(`Auth redirect. li_at present: ${!!liAt}`);
       throw new Error(
-        `LinkedIn redirected to auth page (${landedUrl}). ` +
-        'Make sure your Chrome profile is logged in to LinkedIn and not open in another window.'
+        `LinkedIn redirected to auth page. Run \`npm run setup\` to refresh your session.`
       );
     }
-    logger.debug(`Landed on: ${landedUrl}`);
 
-    // Wait for at least one job card to appear.
-    await page.waitForSelector(SELECTORS.cardContainer, { timeout: 15_000 }).catch(() => {
-      logger.warn('No job cards found within timeout — page may be empty or selectors may need updating.');
-    });
+    let pageNum = 1;
 
-    // Scroll down to trigger lazy-loaded cards.
-    // Swallow scroll errors — a navigation mid-scroll is non-fatal; we just
-    // parse whatever content has loaded so far.
-    try {
-      await autoScroll(page);
-    } catch (err) {
-      logger.warn(`autoScroll interrupted: ${err instanceof Error ? err.message : String(err)}`);
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      logger.info(`Processing listing page ${pageNum}…`);
+
+      // Wait for cards to appear on this page.
+      await page.waitForSelector(SELECTORS.cardContainer, { timeout: 15_000 }).catch(() => {
+        logger.warn('No cards found on this page.');
+      });
+
+      // Scroll the LEFT panel to load all lazy cards.
+      await scrollJobList(page);
+
+      // Parse all card stubs from the left panel HTML.
+      const html = await page.content().catch(() => '');
+      const cards = parseListingCards(html);
+      logger.info(`Page ${pageNum}: found ${cards.length} cards.`);
+
+      // For each card, click it and read the right panel.
+      for (const card of cards) {
+        try {
+          const job = await hydrateViaPanel(page, card);
+          if (job) allJobs.push(job);
+        } catch (err) {
+          logger.warn(`Failed to hydrate ${card.externalId}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        await randomDelay(800, 2_000);
+      }
+
+      // Try to advance to the next page.
+      const advanced = await clickNextPage(page);
+      if (!advanced) {
+        logger.info('No more pages.');
+        break;
+      }
+
+      pageNum++;
+      await randomDelay(2_000, 4_000);
     }
-
-    // page.content() can also throw if the page navigated away. Catch and
-    // return empty rather than crashing the whole poll cycle.
-    let html: string;
-    try {
-      html = await page.content();
-    } catch (err) {
-      logger.warn(`Could not capture page HTML: ${err instanceof Error ? err.message : String(err)}`);
-      return [];
-    }
-    return parseListingCards(html);
   } finally {
     await page.close();
   }
+
+  return allJobs;
 }
 
+// ---------------------------------------------------------------------------
+// Left panel — scroll to load all cards
+// ---------------------------------------------------------------------------
+
 /**
- * Parse job cards from listing page HTML using Cheerio.
+ * Scroll the left-panel job list to trigger lazy loading of all cards.
+ *
+ * The scrollable element is div.scaffold-layout__list — it has its own
+ * independent scroll position separate from the page body. We move the mouse
+ * into its bounding box so that mouse.wheel events are captured by it, not
+ * the right panel or page body.
  */
+async function scrollJobList(page: Page): Promise<void> {
+  const MAX_SCROLLS = 20;
+  const SCROLL_PX   = 600;
+  const TICK_MS     = 300;
+
+  // div.scaffold-layout__list is the actual scrolling container for the left panel.
+  const listPanel = page.locator('div.scaffold-layout__list').first();
+  const box = await listPanel.boundingBox().catch(() => null);
+
+  if (!box) {
+    logger.warn('Could not find scaffold-layout__list bounding box — scroll skipped.');
+    return;
+  }
+
+  // Position the mouse in the upper-centre of the list panel so wheel events
+  // are captured by this scroll container and not the detail pane.
+  const targetX = box.x + box.width / 2;
+  const targetY = box.y + 100; // near the top, clearly inside the list panel
+  await page.mouse.move(targetX, targetY);
+
+  for (let i = 0; i < MAX_SCROLLS; i++) {
+    await page.mouse.wheel(0, SCROLL_PX);
+    await page.waitForTimeout(TICK_MS);
+  }
+
+  // Final pause to let the last batch of lazy-loaded cards render.
+  await page.waitForTimeout(800);
+}
+
+// ---------------------------------------------------------------------------
+// Left panel — parse card stubs
+// ---------------------------------------------------------------------------
+
 function parseListingCards(html: string): JobCard[] {
   const $ = load(html);
   const cards: JobCard[] = [];
@@ -107,11 +169,10 @@ function parseListingCards(html: string): JobCard[] {
       const card = parseCard($, el, fetchedAt);
       if (card) cards.push(card);
     } catch (err) {
-      logger.debug(`Failed to parse card: ${err instanceof Error ? err.message : String(err)}`);
+      logger.debug(`Card parse error: ${err instanceof Error ? err.message : String(err)}`);
     }
   });
 
-  logger.debug(`Parsed ${cards.length} cards from listing HTML.`);
   return cards;
 }
 
@@ -122,17 +183,21 @@ function parseCard(
 ): JobCard | null {
   const $el = $(el);
 
-  const url = normalizeUrl($el.find(SELECTORS.cardLink).attr('href') ?? '');
-  if (!url) return null;
-
-  const externalId = extractJobId(url);
+  const externalId = $el.attr('data-occludable-job-id')?.trim() ?? '';
   if (!externalId) return null;
 
-  const title = $el.find(SELECTORS.cardTitle).text().trim();
-  const company = $el.find(SELECTORS.cardCompany).text().trim();
-  const location = $el.find(SELECTORS.cardLocation).text().trim();
+  const rawHref = $el.find(SELECTORS.cardLink).first().attr('href') ?? '';
+  const url = normalizeUrl(rawHref) || `https://www.linkedin.com/jobs/view/${externalId}/`;
+  const title = $el.find(SELECTORS.cardTitle).first().text().trim();
+  const company = $el.find(SELECTORS.cardCompany).first().text().trim();
+  const location = $el.find(SELECTORS.cardLocation).first().text().trim();
 
   if (!title || !company) return null;
+
+  const easyApply = $el
+    .find(SELECTORS.easyApplyBadge)
+    .toArray()
+    .some((node) => $(node).text().trim().toLowerCase().includes('easy apply'));
 
   return {
     source: 'linkedin',
@@ -141,107 +206,96 @@ function parseCard(
     title,
     company,
     location,
-    teaser: $el.find(SELECTORS.cardTeaser).text().trim() || null,
-    easyApply: $el.find(SELECTORS.easyApplyBadge).length > 0,
-    boosted: $el.find(SELECTORS.promotedBadge).length > 0,
+    teaser: null,
+    easyApply,
+    boosted: false,
     fetchedAt,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Detail page — hydrate a single card into a full JobRecord
+// Right panel — click a card and read the detail pane
 // ---------------------------------------------------------------------------
 
 /**
- * Visit a job's detail page and parse full details into a JobRecord.
- * The caller is responsible for waiting between calls (randomDelay).
+ * Click a job card in the left panel and wait for the right panel to update,
+ * then parse the detail pane HTML into a JobRecord.
+ * No new page/tab is opened — everything happens on the search results page.
  */
-export async function hydrateCard(card: JobCard): Promise<JobRecord | null> {
-  const page = await getPage();
+async function hydrateViaPanel(page: Page, card: JobCard): Promise<JobRecord | null> {
+  logger.debug(`Clicking card ${card.externalId} — ${card.title} @ ${card.company}`);
 
-  try {
-    logger.debug(`Hydrating: ${card.url}`);
+  // Click the card's title link in the left panel.
+  const cardLocator = page.locator(`li[data-occludable-job-id="${card.externalId}"]`);
 
-    await page.goto(card.url, {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
-    });
+  // Scroll the card into view in case it's outside the viewport.
+  await cardLocator.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
 
-    // Wait for the description to load — it's the most important field.
-    await page.waitForSelector(SELECTORS.detailDescription, { timeout: 10_000 }).catch(() => {
-      logger.debug(`Description selector not found for ${card.url}`);
-    });
+  await cardLocator.locator(SELECTORS.cardLink).first().click({ timeout: 5_000 });
 
-    const html = await page.content();
-    return parseDetailPage(card, html);
-  } catch (err) {
-    logger.warn(`Hydration failed for ${card.url}: ${err instanceof Error ? err.message : String(err)}`);
-    return null;
-  } finally {
-    await page.close();
-  }
+  // Wait for the right panel to load the matching job's description.
+  await page
+    .waitForSelector(SELECTORS.detailDescription, { timeout: 10_000 })
+    .catch(() => logger.debug(`Detail panel timeout for ${card.externalId}`));
+
+  // Also wait for the detail panel to show this specific job (not a stale one).
+  await page
+    .waitForSelector(`${SELECTORS.easyApplyButton}[data-job-id="${card.externalId}"], div.jobs-search__job-details--wrapper`, { timeout: 5_000 })
+    .catch(() => {});
+
+  const html = await page.content().catch(() => '');
+  if (!html) return null;
+
+  return await parseDetailPane(card, html);
 }
 
-/**
- * Parse a job detail page HTML into a JobRecord using Cheerio.
- */
-async function parseDetailPage(card: JobCard, html: string): Promise<JobRecord | null> {
+// ---------------------------------------------------------------------------
+// Right panel — parse detail pane
+// ---------------------------------------------------------------------------
+
+async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord | null> {
   const $ = load(html);
 
-  const descriptionHtml =
-    $(SELECTORS.detailDescription).html()?.trim() ?? null;
-  const descriptionText =
-    $(SELECTORS.detailDescription).text().replace(/\s+/g, ' ').trim() || null;
+  const descriptionHtml = $(SELECTORS.detailDescription).html()?.trim() ?? null;
+  const descriptionText = $(SELECTORS.detailDescription).text().replace(/\s+/g, ' ').trim() || null;
 
-  const title = $(SELECTORS.detailTitle).first().text().trim() || card.title;
+  const title   = $(SELECTORS.detailTitle).first().text().trim()   || card.title;
   const company = $(SELECTORS.detailCompany).first().text().trim() || card.company;
-  const locationRaw = $(SELECTORS.detailLocation).first().text().trim() || card.location;
+
+  // Meta spans: [location] [·] [posted age] [·] [applicants] ...
+  const metaSpans = $(SELECTORS.detailMeta)
+    .toArray()
+    .map((el) => $(el).text().trim())
+    .filter(Boolean);
+
+  const locationRaw    = metaSpans[0] ?? card.location;
+  const postedAge      = metaSpans.find((s) => /\d+\s+(minute|hour|day|week|second)s?\s+ago/i.test(s)) ?? null;
+  const applicantCount = metaSpans.find((s) => /applicant/i.test(s)) ?? null;
+
+  const metaText  = $(SELECTORS.repostedSignal).text().toLowerCase();
+  const isReposted = metaText.includes('reposted');
+  const isBoosted  = metaText.includes('promoted by hirer');
+
+  // Pills: salary / employment type / remote
+  const pills = $(SELECTORS.detailPills)
+    .toArray()
+    .map((el) => $(el).text().trim())
+    .filter(Boolean);
 
   const employmentType =
-    $('li.description__job-criteria-item')
-      .filter((_i, el) =>
-        $(el).find('h3').text().toLowerCase().includes('employment type')
-      )
-      .find(SELECTORS.detailEmploymentType)
-      .text()
-      .trim() || null;
+    pills.find((p) => /^(full.time|part.time|contract|temporary|internship|volunteer|other)$/i.test(p)) ?? null;
 
-  const experienceLevel =
-    $('li.description__job-criteria-item')
-      .filter((_i, el) =>
-        $(el).find('h3').text().toLowerCase().includes('seniority level')
-      )
-      .find(SELECTORS.detailExperienceLevel)
-      .text()
-      .trim() || null;
-
-  const applicantCount =
-    $(SELECTORS.detailApplicants).first().text().trim() || null;
-
-  const postedAge =
-    $(SELECTORS.detailPostedAge).first().text().trim() || null;
-
-  const applyUrl =
-    $('a.apply-button--offsiteApply').attr('href') ??
-    $('a[data-tracking-control-name="public_jobs_apply-link-offsite_sign-up"]').attr('href') ??
-    null;
-
-  const easyApply =
-    card.easyApply ||
-    $(SELECTORS.easyApplyButton).length > 0;
+  const easyApply  = card.easyApply || $(SELECTORS.easyApplyButton).length > 0;
+  const applyUrl   = $(SELECTORS.detailApplyLink).attr('href') ?? null;
 
   const locationNormalized = normalizeLocation(locationRaw);
-  const isRemote =
-    locationRaw.toLowerCase().includes('remote') ||
-    locationNormalized.includes('remote');
+  const isRemote = /remote/i.test(locationRaw) || /remote/i.test(locationNormalized);
 
   const companyNormalized = normalizeCompany(company);
-  const titleNormalized = normalizeTitle(title);
+  const titleNormalized   = normalizeTitle(title);
 
-  // Skill extraction from description text
   const { matched, standout } = await matchSkills(descriptionText ?? '');
-
-  const now = nowIso();
+  const now         = nowIso();
   const fingerprint = buildFingerprint({ source: 'linkedin', externalId: card.externalId, company, title });
 
   return {
@@ -254,13 +308,13 @@ async function parseDetailPage(card: JobCard, html: string): Promise<JobRecord |
 
     company,
     companyNormalized,
-    isBlacklisted: false, // set by filters layer
-    recruiterLike: false, // set by recruiter layer
+    isBlacklisted: false,
+    recruiterLike: false,
 
     title,
     titleNormalized,
     employmentType,
-    experienceLevel,
+    experienceLevel: null,
 
     locationRaw,
     locationNormalized,
@@ -273,9 +327,9 @@ async function parseDetailPage(card: JobCard, html: string): Promise<JobRecord |
     applyUrl,
     easyApply,
 
-    isBoosted: card.boosted,
-    isRepublished: false, // detected in dedupe layer
-    legitimacyScore: 100, // adjusted by filters/recruiter layer
+    isBoosted,
+    isRepublished: isReposted,
+    legitimacyScore: 100,
 
     skillsExtracted: [],
     skillsMatched: matched,
@@ -287,53 +341,62 @@ async function parseDetailPage(card: JobCard, html: string): Promise<JobRecord |
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Pagination
 // ---------------------------------------------------------------------------
 
 /**
- * Extract the LinkedIn numeric job ID from a job URL.
- * e.g. https://www.linkedin.com/jobs/view/3812345678/ → "3812345678"
+ * Click the "Next" pagination button and wait for new cards to load.
+ * Returns true if navigation succeeded, false if there is no next page.
  */
-function extractJobId(url: string): string | null {
-  const match = url.match(/\/jobs\/view\/(\d+)/);
-  return match?.[1] ?? null;
-}
+async function clickNextPage(page: Page): Promise<boolean> {
+  // TODO: REMOVE!
+  return false;
+  const nextBtn = page.locator(SELECTORS.paginationNext).first();
 
-/**
- * Scroll down the page incrementally to trigger lazy-loaded cards.
- *
- * Re-reads scrollHeight on every tick so dynamically loaded content extending
- * the page is accounted for. Caps at MAX_SCROLLS to prevent infinite loops on
- * pages with true infinite scroll.
- */
-async function autoScroll(page: Page): Promise<void> {
-  const MAX_SCROLLS = 20;
-  const SCROLL_DISTANCE = 600;
-  const TICK_MS = 200;
+  const isDisabled = await nextBtn.isDisabled().catch(() => true);
+  const isVisible  = await nextBtn.isVisible().catch(() => false);
 
-  for (let i = 0; i < MAX_SCROLLS; i++) {
-    let reachedBottom: boolean;
+  if (!isVisible || isDisabled) return false;
 
-    try {
-      reachedBottom = await page.evaluate((distance: number) => {
-        window.scrollBy(0, distance);
-        return window.scrollY + window.innerHeight >= document.body.scrollHeight - 100;
-      }, SCROLL_DISTANCE);
-    } catch (err) {
-      // Execution context destroyed = page navigated mid-scroll. Not fatal —
-      // just stop scrolling and let the caller capture whatever loaded.
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('context was destroyed') || msg.includes('Target closed')) {
-        logger.debug('Page navigated during scroll — stopping early.');
-        return;
-      }
-      throw err;
-    }
+  // Capture current first card ID so we can detect when the list refreshes.
+  const firstCardBefore = await page
+    .locator(SELECTORS.cardContainer)
+    .first()
+    .getAttribute('data-occludable-job-id')
+    .catch(() => null);
 
-    if (reachedBottom) break;
+  await nextBtn.click();
 
-    await page.waitForTimeout(TICK_MS);
+  // Wait until the first card ID changes — confirms the list has refreshed.
+  // Poll via locator instead of waitForFunction to avoid document/window
+  // TypeScript lib errors (those globals only exist in browser context).
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(500);
+    const firstCardAfter = await page
+      .locator(SELECTORS.cardContainer)
+      .first()
+      .getAttribute('data-occludable-job-id')
+      .catch(() => null);
+    if (firstCardAfter !== null && firstCardAfter !== firstCardBefore) break;
   }
 
-  await page.waitForTimeout(800);
+  return true;
+}
+
+// Keep hydrateCard exported for backward compat with workflow — it now
+// delegates to the panel approach via a dedicated page.
+export async function hydrateCard(card: JobCard): Promise<JobRecord | null> {
+  const page = await getPage();
+  try {
+    await page.goto(card.url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.waitForSelector(SELECTORS.detailDescription, { timeout: 10_000 }).catch(() => {});
+    const html = await page.content().catch(() => '');
+    return html ? await parseDetailPane(card, html) : null;
+  } catch (err) {
+    logger.warn(`hydrateCard fallback failed: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  } finally {
+    await page.close();
+  }
 }
