@@ -2,11 +2,13 @@ import { load } from 'cheerio';
 import type { Page } from 'patchright';
 import { getPage } from '../browser.js';
 import { normalizeCompany, normalizeTitle, normalizeLocation, normalizeUrl } from '../core/normalize.js';
-import { buildFingerprint } from '../core/fingerprint.js';
+import { buildFingerprint, buildFuzzyFingerprint  } from '../core/fingerprint.js';
 import { matchSkills } from '../core/skills.js';
 import { nowIso, randomDelay } from '../utils/dates.js';
 import { logger } from '../utils/logger.js';
 import type { JobCard, JobRecord } from '../core/types.js';
+import { readJobs } from '../storage/jobsFile.js';
+import { parseSalary } from '../utils/salary.js';
 
 // ---------------------------------------------------------------------------
 // Selectors — LinkedIn authenticated SRP as of 2026.
@@ -86,8 +88,30 @@ export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRec
       const cards = parseListingCards(html);
       logger.info(`Page ${pageNum}: found ${cards.length} cards.`);
 
+      // History check, early stopper
+      const history = await readJobs();
+      const historicFingerprints = new Set(history.map((j) => j.fingerprint));
+      const historicFuzzy = new Set(history.map((j) =>
+        buildFuzzyFingerprint({ source: j.source, company: j.company, title: j.title })
+      ));
+
+      // Check how many cards on this page are already known
+      const newCards = cards.filter((card) => {
+        const fp = buildFingerprint({ source: 'linkedin', externalId: card.externalId, company: card.company, title: card.title });
+        const fuzzy = buildFuzzyFingerprint({ source: 'linkedin', company: card.company, title: card.title });
+        return !historicFingerprints.has(fp) && !historicFuzzy.has(fuzzy);
+      });
+
+      logger.info(`Page ${pageNum}: ${newCards.length}/${cards.length} cards are new.`);
+
+      if (newCards.length === 0) {
+        logger.info('All cards on this page already seen — stopping pagination early.');
+        break;
+      }
+
+      // Only hydrate the new ones
       // For each card, click it and read the right panel.
-      for (const card of cards) {
+      for (const card of newCards) {
         try {
           const job = await hydrateViaPanel(page, card);
           if (job) allJobs.push(job);
@@ -270,7 +294,7 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
 
   const locationRaw    = metaSpans[0] ?? card.location;
   const postedAge      = metaSpans.find((s) => /\d+\s+(minute|hour|day|week|second)s?\s+ago/i.test(s)) ?? null;
-  const applicantCount = metaSpans.find((s) => /applicant/i.test(s)) ?? null;
+  const applicantCount = metaSpans.find((s) => /applicant/i.test(s) || /people clicked apply/i.test(s)) ?? null;
 
   const metaText  = $(SELECTORS.repostedSignal).text().toLowerCase();
   const isReposted = metaText.includes('reposted');
@@ -281,6 +305,9 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
     .toArray()
     .map((el) => $(el).text().trim())
     .filter(Boolean);
+
+  const salaryPill = pills.find((p) => /\$|\d+[Kk]/.test(p)) ?? null;
+  const salary = salaryPill ? parseSalary(salaryPill) : parseSalary(descriptionText ?? '');
 
   const employmentType =
     pills.find((p) => /^(full.time|part.time|contract|temporary|internship|volunteer|other)$/i.test(p)) ?? null;
@@ -335,6 +362,8 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
     skillsMatched: matched,
     skillsStandout: standout,
 
+    salary: salary,
+
     applicantCount,
     postedAge,
   };
@@ -349,8 +378,6 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
  * Returns true if navigation succeeded, false if there is no next page.
  */
 async function clickNextPage(page: Page): Promise<boolean> {
-  // TODO: REMOVE!
-  return false;
   const nextBtn = page.locator(SELECTORS.paginationNext).first();
 
   const isDisabled = await nextBtn.isDisabled().catch(() => true);
@@ -384,6 +411,7 @@ async function clickNextPage(page: Page): Promise<boolean> {
   return true;
 }
 
+// TODO: This should never be called because we hydrate via the panel
 // Keep hydrateCard exported for backward compat with workflow — it now
 // delegates to the panel approach via a dedicated page.
 export async function hydrateCard(card: JobCard): Promise<JobRecord | null> {

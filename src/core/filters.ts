@@ -23,12 +23,15 @@ export async function filterCards(cards: JobCard[]): Promise<JobCard[]> {
 
   const survivors: JobCard[] = [];
 
+  logger.debug(`Received ${cards.length} cards from LinkedIn. Running filters…`);
   for (const card of cards) {
     const reason = getFilterReason(card, blacklist, blockedTitles, requireRemote);
+
     if (reason) {
       logger.debug(`Filtered "${card.title}" @ "${card.company}": ${reason}`);
       continue;
     }
+
     survivors.push(card);
   }
 

@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import type { JobRecord } from '../core/types.js';
+import { formatSalary } from "../utils/salary.ts";
 
 const DIVIDER = chalk.gray('─'.repeat(72));
 
@@ -28,6 +29,9 @@ function renderJob(job: JobRecord): void {
     : chalk.gray(job.locationRaw || 'Location unknown');
   console.log(`  ${locationStr}`);
 
+  const salaryStr = job.salary ? formatSalary(job.salary) : 'Salary unknown';
+  console.log(`  ${chalk.gray(salaryStr)}`);
+
   // Meta row
   const meta: string[] = [];
   if (job.employmentType) meta.push(job.employmentType);
@@ -55,6 +59,9 @@ function renderJob(job: JobRecord): void {
 
   // URL
   console.log(`  ${chalk.underline.gray(job.url)}`);
+  // TODO: requires modern OSC 8. Must switch to windows terminal.
+  // const osc8Link = `\x1b]8;;${job.url}\x1b\\${job.url}\x1b]8;;\x1b\\`;
+  // console.log(`  ${chalk.cyan(osc8Link)}`);
 
   console.log(DIVIDER);
 }

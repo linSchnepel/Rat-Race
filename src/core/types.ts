@@ -2,6 +2,8 @@
 // Raw card extracted from a LinkedIn listing page
 // ---------------------------------------------------------------------------
 
+import { SalaryRange } from "../utils/salary.ts";
+
 export interface JobCard {
   /** Source platform identifier */
   source: 'linkedin' | 'ziprecruiter';
@@ -73,6 +75,8 @@ export interface JobRecord {
   skillsExtracted: string[];
   skillsMatched: string[];
   skillsStandout: string[];
+
+  salary: SalaryRange | null;
 
   // Metrics (best-effort; may be null if LinkedIn hides them)
   applicantCount: string | null;

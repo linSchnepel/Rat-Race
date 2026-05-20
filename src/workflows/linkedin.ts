@@ -9,10 +9,9 @@ import { logger } from '../utils/logger.js';
 import type { JobCard } from '../core/types.js';
 
 const POLL_INTERVAL_MS = parseInt(process.env['POLL_INTERVAL_MS'] ?? '600000', 10);
-const SEARCH_URL = process.env['LINKEDIN_SEARCH_URL'] ?? '';
 
-export async function runLinkedInWorkflow(): Promise<void> {
-  if (!SEARCH_URL) {
+export async function runLinkedInWorkflow(url: string): Promise<void> {
+  if (!url) {
     throw new Error('LINKEDIN_SEARCH_URL is not set in your environment.');
   }
 
@@ -27,7 +26,7 @@ export async function runLinkedInWorkflow(): Promise<void> {
     await ensureLinkedInSession();
 
     try {
-      await runOnce();
+      await runOnce(url);
     } catch (err) {
       logger.error('Initial poll cycle failed — will retry on next interval', err);
     }
@@ -35,7 +34,7 @@ export async function runLinkedInWorkflow(): Promise<void> {
     logger.info(`Polling every ${POLL_INTERVAL_MS / 1000}s. Press Ctrl+C to stop.`);
     const timer = setInterval(async () => {
       try {
-        await runOnce();
+        await runOnce(url);
       } catch (err) {
         logger.error('Poll cycle failed', err);
       }
@@ -51,13 +50,13 @@ export async function runLinkedInWorkflow(): Promise<void> {
   }
 }
 
-async function runOnce(): Promise<void> {
+async function runOnce(url: string): Promise<void> {
   logger.info('--- Starting new poll cycle ---');
   const cycleStart = Date.now();
 
   // Fetch all pages and hydrate via the right panel — single browser session.
   // Returns fully hydrated JobRecords; no separate hydration loop needed.
-  const allJobs = await fetchAndHydrateAllCards(SEARCH_URL);
+  const allJobs = await fetchAndHydrateAllCards(url);
   logger.info(`Fetched and hydrated ${allJobs.length} jobs across all pages.`);
 
   if (allJobs.length === 0) {
