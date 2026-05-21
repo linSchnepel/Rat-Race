@@ -8,10 +8,13 @@ import { render } from '../cli/render.js';
 import { logger } from '../utils/logger.js';
 import type { JobCard } from '../core/types.js';
 
-const POLL_INTERVAL_MS = parseInt(process.env['POLL_INTERVAL_MS'] ?? '600000', 10);
+// TODO: move this to a utils file since it's duplicated
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-export async function runLinkedInWorkflow(url: string): Promise<void> {
-  if (!url) {
+export async function runLinkedInWorkflow(urls: [string, string]): Promise<void> {
+  if (!urls || (urls.length != 2)  ) { // TODO: make this array dynamic
     throw new Error('LINKEDIN_SEARCH_URL is not set in your environment.');
   }
 
@@ -27,24 +30,13 @@ export async function runLinkedInWorkflow(url: string): Promise<void> {
     await ensureLinkedInSession();
 
     try {
-      await runOnce(url);
+      await runOnce(urls[0]);
+      await delay(300000); // 5 min
+      await runOnce(urls[1]);
     } catch (err) {
       logger.error('Initial poll cycle failed — will retry on next interval', err);
     }
 
-    logger.info(`Polling every ${POLL_INTERVAL_MS / 1000}s. Press Ctrl+C to stop.`);
-    const timer = setInterval(async () => {
-      try {
-        await runOnce(url);
-      } catch (err) {
-        logger.error('Poll cycle failed', err);
-      }
-    }, POLL_INTERVAL_MS);
-
-    await new Promise<void>((resolve) => {
-      process.once('SIGINT', () => { clearInterval(timer); resolve(); });
-      process.once('SIGTERM', () => { clearInterval(timer); resolve(); });
-    });
   } finally {
     await closeBrowser();
     logger.info('Browser closed. Goodbye.');

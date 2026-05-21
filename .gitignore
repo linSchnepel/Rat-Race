@@ -4,6 +4,7 @@ dist/
 
 # Contains auth cookies
 data/auth.json
+data/auth
 
 # Job history and runtime state
 data/jobs.jsonl
