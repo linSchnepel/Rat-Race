@@ -20,6 +20,7 @@ export async function runLinkedInWorkflow(url: string): Promise<void> {
   await initBrowser({
     headless: process.env['HEADLESS'] !== 'false',
     timezone: process.env['TZ'] ?? 'America/Chicago',
+    source: 'linkedin'
   });
 
   try {

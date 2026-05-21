@@ -4,7 +4,11 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const AUTH_FILE = join(__dirname, '../data/auth.json');
+//const AUTH_FILE = join(__dirname, '../data/auth.json');
+
+export function getAuthFile(source: string): string {
+  return join(__dirname, `../data/auth/${source}.json`);
+}
 
 let context: BrowserContext | null = null;
 
@@ -21,14 +25,16 @@ export interface BrowserOptions {
  *
  * Run `npx tsx scripts/setup-auth.ts` whenever the session expires.
  */
-export async function initBrowser(opts: BrowserOptions = {}): Promise<void> {
+export async function initBrowser(opts: BrowserOptions & { source?: string } = {}): Promise<void> {
   if (context) {
     throw new Error('Browser already initialized. Call closeBrowser() first.');
   }
 
-  if (!existsSync(AUTH_FILE)) {
+  const authFile = getAuthFile(opts.source ?? 'linkedin');
+
+  if (!existsSync(authFile)) {
     throw new Error(
-      `Auth file not found at ${AUTH_FILE}. ` +
+      `Auth file not found at ${authFile}. ` +
         'Run `npx tsx scripts/setup-auth.ts` first to log in and save your session.'
     );
   }
@@ -44,7 +50,7 @@ export async function initBrowser(opts: BrowserOptions = {}): Promise<void> {
   });
 
   context = await browser.newContext({
-    storageState: AUTH_FILE,
+    storageState: authFile,
     viewport: { width: 1440, height: 900 },
     locale: opts.locale ?? 'en-US',
     timezoneId: opts.timezone ?? 'America/Chicago',
