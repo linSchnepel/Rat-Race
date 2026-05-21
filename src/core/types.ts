@@ -6,7 +6,7 @@ import { SalaryRange } from "../utils/salary.ts";
 
 export interface JobCard {
   /** Source platform identifier */
-  source: 'linkedin' | 'ziprecruiter';
+  source: 'linkedin' | 'indeed' | 'ziprecruiter';
   /** Canonical job URL (detail page) */
   url: string;
   /** LinkedIn internal job ID parsed from the URL/card */
