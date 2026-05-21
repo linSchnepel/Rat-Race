@@ -16,7 +16,9 @@ function shouldLog(level: LogLevel): boolean {
 }
 
 function timestamp(): string {
-  return new Date().toISOString().slice(11, 19); // HH:MM:SS
+  var d = new Date();
+  d.setHours(d.getHours() - 5); // Hack to get CST without pulling in a timezone library
+  return d.toISOString().slice(11, 19); // HH:MM:SS
 }
 
 export const logger = {
