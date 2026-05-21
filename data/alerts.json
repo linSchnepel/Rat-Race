@@ -1,0 +1,5 @@
+{
+  "rules": [
+    { "name": "Any new job",       "sound": "newJob",     "minSalary": null, "titleContains": null,  "minStandoutSkills": 0 }
+  ]
+}

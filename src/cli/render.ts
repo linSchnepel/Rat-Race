@@ -1,6 +1,10 @@
 import chalk from 'chalk';
 import type { JobRecord } from '../core/types.js';
 import { formatSalary } from "../utils/salary.ts";
+import { evaluateAlerts } from '../core/alerts.ts';
+
+import alerts from "../../data/alerts.json" with { type: "json" };
+import { sounds } from '../utils/audio.ts';
 
 const DIVIDER = chalk.gray('─'.repeat(72));
 
@@ -12,12 +16,21 @@ export function render(jobs: JobRecord[]): void {
 
   console.log('\n' + chalk.bold.green(`✦ ${jobs.length} new job${jobs.length === 1 ? '' : 's'} found\n`));
 
+  sounds["newJob" as keyof typeof sounds]?.();
   for (const job of jobs) {
     renderJob(job);
   }
 }
 
 function renderJob(job: JobRecord): void {
+  /** 
+  const triggeredSounds = evaluateAlerts(job, alerts.rules);
+  const highestPriority = triggeredSounds.at(-1); // last rule = highest priority
+  if (highestPriority) {
+    sounds[highestPriority as keyof typeof sounds]?.();
+  }
+    */
+
   // Header: company — title
   const companyStr = chalk.bold.white(job.company);
   const titleStr = chalk.bold.yellow(job.title);
