@@ -1,5 +1,5 @@
 import { initBrowser, closeBrowser } from '../browser.js';
-import { ensureLinkedInSession } from '../auth/linkedin.js';
+import { ensureLinkedInSession } from '../auth/verify.js';
 import { fetchAndHydrateAllCards } from '../sources/linkedin.js';
 import { filterCards } from '../core/filters.js';
 import { dedupeCards, dedupeJobs, dedupeAgainstHistory } from '../core/dedupe.js';
