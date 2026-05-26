@@ -15,7 +15,8 @@
     "test": "echo \"No tests yet\" && exit 0",
     "setup":         "tsx scripts/setup-auth.ts",
     "setup:linkedin": "tsx scripts/setup-auth.ts linkedin",
-    "setup:indeed":   "tsx scripts/setup-auth.ts indeed"
+    "setup:indeed":   "tsx scripts/setup-auth.ts indeed",
+    "setup:ziprecruiter": "tsx scripts/setup-auth.ts ziprecruiter"
   },
   "dependencies": {
     "chalk": "^5.6.2",

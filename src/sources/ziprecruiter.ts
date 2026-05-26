@@ -1,0 +1,369 @@
+import { load } from 'cheerio';
+import type { Page } from 'patchright';
+import { getPage } from '../browser.js';
+import { normalizeCompany, normalizeTitle, normalizeLocation } from '../core/normalize.js';
+import { buildFingerprint } from '../core/fingerprint.js';
+import { matchSkills } from '../core/skills.js';
+import { parseSalary } from '../utils/salary.js';
+import { nowIso, randomDelay } from '../utils/dates.js';
+import { logger } from '../utils/logger.js';
+import type { JobCard, JobRecord } from '../core/types.js';
+
+// ---------------------------------------------------------------------------
+// Selectors
+// ---------------------------------------------------------------------------
+
+const SELECTORS = {
+  // Left pane
+  cardContainer:    'article[id^="job-card-"]',
+  cardTitle:        'h2[aria-label]',
+  cardCompany:      'a[data-testid="job-card-company"]',
+  cardLocation:     'a[data-testid="job-card-location"]',
+  cardLocationSpan: 'a[data-testid="job-card-location"] + span',
+  quickApplyBadge:  'p.text-brand',
+
+  // Job IDs from ld+json
+  ldJson: 'script[type="application/ld+json"]',
+
+  // Right pane
+  rightPane:        'div[data-testid="right-pane"]',
+  detailTitle:      'div[data-testid="job-details-scroll-container"] h2.font-bold',
+  detailCompany:    'div[data-testid="job-details-scroll-container"] a[href^="/co/"]',
+  detailLocation:   'div[data-testid="job-details-scroll-container"] div.grid > div.grid > div.mb-24 p',
+  detailDescription:'div.text-primary.whitespace-pre-line',
+  detailApplyLink:  'a[aria-label="Apply"]',
+  detailMeta:       'div[data-testid="job-details-scroll-container"] div.flex.gap-x-12 p.text-body-md',
+
+  // Left pane scroll container
+  leftPaneScroll:   'section.job_results_two_pane',
+
+  // Pagination
+  paginationNext:   'a[title="Next Page"]',
+};
+
+// ---------------------------------------------------------------------------
+// Main export
+// ---------------------------------------------------------------------------
+
+export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRecord[]> {
+  const listPage = await getPage();
+  const detailPage = await getPage();
+  const allJobs: JobRecord[] = [];
+  let currentUrl = searchUrl;
+  let pageNum = 1;
+
+  try {
+    while (true) {
+      logger.info(`ZipRecruiter: fetching page ${pageNum} — ${currentUrl}`);
+
+      await listPage.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+
+      const landedUrl = listPage.url();
+      if (landedUrl.includes('/login') || landedUrl.includes('/account/login')) {
+        throw new Error('ZipRecruiter redirected to login. Run `npm run setup:ziprecruiter` to refresh your session.');
+      }
+
+      await listPage.waitForSelector(SELECTORS.cardContainer, { timeout: 15_000 }).catch(() => {
+        logger.warn('ZipRecruiter: no cards found on this page.');
+      });
+
+      await scrollLeftPane(listPage);
+
+      const html = await listPage.content().catch(() => '');
+      const { cards } = parseListingCards(html);
+      logger.info(`ZipRecruiter page ${pageNum}: ${cards.length} cards.`);
+
+      for (const card of cards) {
+        try {
+          const job = await hydrateViaDetailPage(detailPage, card, currentUrl);
+          if (job) allJobs.push(job);
+        } catch (err) {
+          logger.warn(`ZipRecruiter hydration failed for ${card.externalId}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        await randomDelay(1_000, 2_500);
+      }
+
+      // Get next page URL from the listing page's current HTML
+      break;
+      const nextUrl = getNextPageUrl(html);
+      if (!nextUrl) {
+        logger.info('ZipRecruiter: no more pages.');
+        break;
+      }
+
+      //currentUrl = nextUrl;
+      pageNum++;
+      await randomDelay(3_000, 7_000);
+    }
+  } finally {
+    await listPage.close();
+    await detailPage.close();
+  }
+
+  return allJobs;
+}
+
+// ---------------------------------------------------------------------------
+// Left pane scroll
+// ---------------------------------------------------------------------------
+
+async function scrollLeftPane(page: Page): Promise<void> {
+  const MAX_SCROLLS = 20;
+  const SCROLL_PX   = 600;
+  const TICK_MS     = 300;
+
+  const panel = page.locator(SELECTORS.leftPaneScroll).first();
+  const box = await panel.boundingBox().catch(() => null);
+
+  if (!box) {
+    logger.warn('ZipRecruiter: could not find left pane bounding box — scroll skipped.');
+    return;
+  }
+
+  await page.mouse.move(box.x + box.width / 2, box.y + 100);
+
+  for (let i = 0; i < MAX_SCROLLS; i++) {
+    await page.mouse.wheel(0, SCROLL_PX);
+    await page.waitForTimeout(TICK_MS);
+  }
+
+  await page.waitForTimeout(800);
+}
+
+// ---------------------------------------------------------------------------
+// Left pane parsing
+// ---------------------------------------------------------------------------
+
+interface ParseResult {
+  cards: JobCard[];
+  jobIdMap: Map<string, string>; // cardId -> jid
+}
+
+function parseListingCards(html: string): ParseResult {
+  const $ = load(html);
+  const cards: JobCard[] = [];
+  const fetchedAt = nowIso();
+
+  // Extract job IDs from ld+json — maps position to jid
+  const jidMap = new Map<number, string>();
+  $(SELECTORS.ldJson).each((_i, el) => {
+    try {
+      const data = JSON.parse($(el).html() ?? '');
+      if (data['@type'] === 'ItemList' && Array.isArray(data.itemListElement)) {
+        for (const item of data.itemListElement) {
+          const jidMatch = (item.url as string)?.match(/[?&]jid=([a-f0-9]+)/);
+          if (jidMatch?.[1]) {
+            jidMap.set(item.position as number, jidMatch[1]);
+          }
+        }
+      }
+    } catch { /* ignore malformed ld+json */ }
+  });
+
+  // Only parse the desktop cards (hidden md:block) to avoid duplicates
+  // Each card appears twice in HTML (mobile + desktop) — target the desktop wrapper
+  $('div.hidden.md\\:block article[id^="job-card-"]').each((i, el) => {
+    try {
+      const card = parseCard($, el, fetchedAt, jidMap.get(i + 1) ?? null);
+      if (card) cards.push(card);
+    } catch (err) {
+      logger.debug(`ZipRecruiter card parse error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+
+  return { cards, jobIdMap: new Map() };
+}
+
+function parseCard(
+  $: ReturnType<typeof load>,
+  el: ReturnType<typeof $>[0],
+  fetchedAt: string,
+  jid: string | null
+): JobCard | null {
+  const $el = $(el);
+
+  // externalId from jid (preferred) or from the article id attribute
+  const articleId = $el.attr('id') ?? ''; // e.g. "job-card-1tQzxcscEft2Su_wDcZLow"
+  const externalId = jid ?? articleId.replace('job-card-', '');
+  if (!externalId) return null;
+
+  const title   = $el.find(SELECTORS.cardTitle).first().attr('aria-label')?.trim() ?? '';
+  const company = $el.find(SELECTORS.cardCompany).first().text().trim();
+
+  // Location: link text + optional " · On-site +1" span
+  const locationBase = $el.find(SELECTORS.cardLocation).first().text().trim();
+  const locationSuffix = $el.find(SELECTORS.cardLocationSpan).first().text().trim();
+  const location = locationSuffix ? `${locationBase}${locationSuffix}` : locationBase;
+
+  if (!title || !company) return null;
+
+  // Salary: find a <p> matching currency/K pattern
+  const salaryRaw = $el.find('p.text-body-md').toArray()
+    .map((n) => $(n).text().trim())
+    .find((t) => /\$|\d+[Kk]\/yr/.test(t)) ?? null;
+
+  // Quick apply
+  const quickApply = $el.find(SELECTORS.quickApplyBadge).toArray()
+    .some((n) => $(n).text().trim().toLowerCase().includes('quick apply'));
+
+  return {
+    source: 'ziprecruiter' as const,
+    url: 'rodo',
+    externalId,
+    title,
+    company,
+    location,
+    teaser: salaryRaw,
+    easyApply: quickApply,
+    boosted: false,
+    fetchedAt,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Right pane hydration
+// ---------------------------------------------------------------------------
+
+async function hydrateViaDetailPage(page: Page, card: JobCard, listingUrl: string): Promise<JobRecord | null> {
+  logger.debug(`ZipRecruiter: hydrating ${card.externalId} — ${card.title}`);
+
+  const url = new URL(listingUrl);
+  url.searchParams.set('lk', card.externalId);
+
+  await page.goto(url.toString(), { waitUntil: 'domcontentloaded', timeout: 30_000 });
+
+  await page.waitForSelector(SELECTORS.detailDescription, { timeout: 10_000 })
+    .catch(() => logger.debug(`ZipRecruiter: detail pane timeout for ${card.externalId}`));
+
+  const html = await page.content().catch(() => '');
+  if (!html) return null;
+
+  return parseDetailPane(card, html);
+}
+
+async function hydrateViaPanel(page: Page, card: JobCard): Promise<JobRecord | null> {
+  logger.debug(`ZipRecruiter: navigating to job ${card.externalId} — ${card.title}`);
+
+  // ZipRecruiter loads the right pane by setting lk= to the card's match token.
+  // The externalId IS the match token (from article id minus "job-card-" prefix).
+  const currentUrl = new URL(page.url());
+  currentUrl.searchParams.set('lk', card.externalId);
+
+  await page.goto(currentUrl.toString(), { waitUntil: 'domcontentloaded', timeout: 30_000 });
+
+  await page.waitForSelector(SELECTORS.detailDescription, { timeout: 10_000 })
+    .catch(() => logger.debug(`ZipRecruiter: detail pane timeout for ${card.externalId}`));
+
+  const html = await page.content().catch(() => '');
+  if (!html) return null;
+
+  return await parseDetailPane(card, html);
+}
+
+// ---------------------------------------------------------------------------
+// Right pane parsing
+// ---------------------------------------------------------------------------
+
+async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord | null> {
+  const $ = load(html);
+
+  const scrollContainer = $('div[data-testid="job-details-scroll-container"]');
+
+  const title   = scrollContainer.find('h2.font-bold').first().text().trim() || card.title;
+  const company = scrollContainer.find('a[href^="/co/"]').first().text().trim() || card.company;
+
+  // Location is the <p> directly in the grid after company
+  const locationRaw = scrollContainer
+    .find('div.grid > div.grid > div.mb-24 p').first().text().trim()
+    || card.location;
+
+  const descriptionHtml = $(SELECTORS.detailDescription).html()?.trim() ?? null;
+  const descriptionText = $(SELECTORS.detailDescription).text().replace(/\s+/g, ' ').trim() || null;
+
+  // Meta items: employment type, benefits, posted age
+  // Each is a <div class="flex gap-x-12"> containing an svg + <p>
+  const metaTexts = scrollContainer.find('div.flex.gap-x-12 p.text-body-md')
+    .toArray()
+    .map((el) => $(el).text().trim())
+    .filter(Boolean);
+
+  const employmentType = metaTexts.find((t) =>
+    /^(full.time|part.time|contract|temporary|internship)/i.test(t)
+  ) ?? null;
+
+  const postedAge = metaTexts.find((t) =>
+    /\d+\s+(minute|hour|day|week)s?\s+ago/i.test(t) || /posted/i.test(t)
+  ) ?? null;
+
+  // Apply URL
+  const applyUrl = scrollContainer.find('a[aria-label="Apply"]').first().attr('href') ?? null;
+
+  // Salary: prefer card teaser (already extracted), fall back to description
+  const salaryRaw = card.teaser || null;
+  const salary = salaryRaw ? parseSalary(salaryRaw) : null;
+
+  const locationNormalized = normalizeLocation(locationRaw);
+  const isRemote = /remote/i.test(locationRaw) || /remote/i.test(locationNormalized);
+
+  const { matched, standout } = await matchSkills(descriptionText ?? '');
+  const now         = nowIso();
+  const fingerprint = buildFingerprint({
+    source: 'ziprecruiter',
+    externalId: card.externalId,
+    company,
+    title,
+  });
+
+  return {
+    source: 'ziprecruiter' as const,
+    url: card.url,
+    externalId: card.externalId,
+    fingerprint,
+    firstSeen: now,
+    lastSeen: now,
+
+    company,
+    companyNormalized: normalizeCompany(company),
+    isBlacklisted: false,
+    recruiterLike: false,
+
+    title,
+    titleNormalized: normalizeTitle(title),
+    employmentType,
+    experienceLevel: null,
+
+    locationRaw,
+    locationNormalized,
+    isRemote,
+
+    teaser: null,
+    descriptionHtml,
+    descriptionText,
+
+    applyUrl,
+    easyApply: card.easyApply,
+
+    isBoosted: false,
+    isRepublished: false,
+    legitimacyScore: 100,
+
+    salary,
+    skillsExtracted: [],
+    skillsMatched: matched,
+    skillsStandout: standout,
+
+    applicantCount: null,
+    postedAge,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Pagination
+// ---------------------------------------------------------------------------
+
+function getNextPageUrl(html: string): string | null {
+  const $ = load(html);
+  const href = $(SELECTORS.paginationNext).attr('href');
+  if (!href) return null;
+  return href.startsWith('http') ? href : `https://www.ziprecruiter.com${href}`;
+}

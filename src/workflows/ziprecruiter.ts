@@ -1,6 +1,6 @@
 import { initBrowser, closeBrowser } from '../browser.js';
-import { ensureIndeedSession } from '../auth/verify.js';
-import { fetchAndHydrateAllCards } from '../sources/indeed.js';
+import { ensureZiprecruiterSession } from '../auth/verify.js';
+import { fetchAndHydrateAllCards } from '../sources/ziprecruiter.js';
 import { filterCards } from '../core/filters.js';
 import { dedupeCards, dedupeJobs, dedupeAgainstHistory } from '../core/dedupe.js';
 import { readJobs, appendJobs } from '../storage/jobsFile.js';
@@ -12,22 +12,22 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export async function runIndeedWorkflow(url: string): Promise<void> {
+export async function runZiprecruiterWorkflow(url: string): Promise<void> {
   if (!url) {
-    throw new Error('INDEED_SEARCH_URL is not set in your environment.');
+    throw new Error('ZIPRECRUITER_SEARCH_URL is not set in your environment.');
   }
 
-  logger.info('Starting Indeed job scout…');
+  logger.info('Starting Ziprecruiter job scout…');
 
   // include source string here
 
   await initBrowser({
     headless: process.env['HEADLESS'] !== 'false',
     timezone: process.env['TZ'] ?? 'America/Chicago',
-    source: 'indeed'});
+    source: 'ziprecruiter'});
 
   try {
-    await ensureIndeedSession();
+    await ensureZiprecruiterSession();
 
     try {
       await runOnce(url);

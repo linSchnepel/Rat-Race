@@ -63,6 +63,29 @@ export async function ensureIndeedSession(): Promise<void> {
   logger.info('Session verified successfully.');
 }
 
+export async function ensureZiprecruiterSession(): Promise<void> {
+  const state = await loadSessionState();
+
+  // Skip re-verification if we checked recently.
+  if (
+    state.lastVerified !== null &&
+    Date.now() - state.lastVerified < SESSION_TTL_MS
+  ) {
+    logger.debug('Session still valid (within TTL). Skipping re-verification.');
+    return;
+  }
+
+  logger.info('Verifying Ziprecruiter session…');
+  await verifySession('https://www.ziprecruiter.com/profile', '/authn/login');
+
+  await saveSessionState({
+    lastVerified: Date.now(),
+    cookieHash: null,
+  });
+
+  logger.info('Session verified successfully.');
+}
+
 /**
  * Navigate to /feed and assert we are not redirected to /login.
  * Throws a descriptive error if the session cookie is expired or invalid.

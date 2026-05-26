@@ -13,6 +13,11 @@ export const adapters: Record<string, AuthAdapter> = {
   indeed: {
     name: 'Indeed',
     loginUrl: 'https://secure.indeed.com/account/login',
-    waitForUrl: '**/jobs**',
+    waitForUrl: 'profile**',
+  },
+  ziprecruiter: {
+    name: 'ZipRecruiter',
+    loginUrl: 'https://www.ziprecruiter.com/authn/login',
+    waitForUrl: 'https://www.ziprecruiter.com/jobseeker/home',
   },
 };

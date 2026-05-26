@@ -2,11 +2,13 @@ import 'dotenv/config';
 import { runLinkedInWorkflow } from './workflows/linkedin.js';
 import { logger } from './utils/logger.js';
 import { runIndeedWorkflow } from './workflows/indeed.ts';
+import { runZiprecruiterWorkflow } from './workflows/ziprecruiter.ts';
 
 // TODO: Loop instead of harcode these select values
 const SEARCH_URL = process.env['LINKEDIN_SEARCH_URL'] ?? '';
 const SEARCH_URL_REMOTE = process.env['LINKEDIN_SEARCH_URL_REMOTE'] ?? '';
 const SEARCH_URL_INDEED = process.env['INDEED_SEARCH_URL'] ?? '';
+const SEARCH_URL_ZIPRECRUITER = process.env['ZIPRECRUITER_SEARCH_URL'] ?? '';
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -24,6 +26,7 @@ async function pollLoop(): Promise<void> {
         logger.error('Fatal error', err);
         process.exit(1);
       });
+      await runZiprecruiterWorkflow(SEARCH_URL_ZIPRECRUITER);
     } catch (err) {
       logger.error('Poll cycle failed', err);
     }
