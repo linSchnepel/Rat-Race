@@ -70,7 +70,7 @@ export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRec
       await scrollLeftPane(listPage);
 
       const html = await listPage.content().catch(() => '');
-      const { cards } = parseListingCards(html);
+      const { cards } = parseListingCards(html, currentUrl);
       logger.info(`ZipRecruiter page ${pageNum}: ${cards.length} cards.`);
 
       for (const card of cards) {
@@ -84,14 +84,13 @@ export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRec
       }
 
       // Get next page URL from the listing page's current HTML
-      break;
       const nextUrl = getNextPageUrl(html);
       if (!nextUrl) {
         logger.info('ZipRecruiter: no more pages.');
         break;
       }
 
-      //currentUrl = nextUrl;
+      currentUrl = nextUrl;
       pageNum++;
       await randomDelay(3_000, 7_000);
     }
@@ -139,32 +138,16 @@ interface ParseResult {
   jobIdMap: Map<string, string>; // cardId -> jid
 }
 
-function parseListingCards(html: string): ParseResult {
+function parseListingCards(html: string, baseUrl: string): ParseResult {
   const $ = load(html);
   const cards: JobCard[] = [];
   const fetchedAt = nowIso();
 
-  // Extract job IDs from ld+json — maps position to jid
-  const jidMap = new Map<number, string>();
-  $(SELECTORS.ldJson).each((_i, el) => {
-    try {
-      const data = JSON.parse($(el).html() ?? '');
-      if (data['@type'] === 'ItemList' && Array.isArray(data.itemListElement)) {
-        for (const item of data.itemListElement) {
-          const jidMatch = (item.url as string)?.match(/[?&]jid=([a-f0-9]+)/);
-          if (jidMatch?.[1]) {
-            jidMap.set(item.position as number, jidMatch[1]);
-          }
-        }
-      }
-    } catch { /* ignore malformed ld+json */ }
-  });
-
   // Only parse the desktop cards (hidden md:block) to avoid duplicates
-  // Each card appears twice in HTML (mobile + desktop) — target the desktop wrapper
+  // Each card appears twice in HTML (mobile + desktop) target the desktop wrapper
   $('div.hidden.md\\:block article[id^="job-card-"]').each((i, el) => {
     try {
-      const card = parseCard($, el, fetchedAt, jidMap.get(i + 1) ?? null);
+      const card = parseCard($, el, fetchedAt, baseUrl);
       if (card) cards.push(card);
     } catch (err) {
       logger.debug(`ZipRecruiter card parse error: ${err instanceof Error ? err.message : String(err)}`);
@@ -178,37 +161,36 @@ function parseCard(
   $: ReturnType<typeof load>,
   el: ReturnType<typeof $>[0],
   fetchedAt: string,
-  jid: string | null
+  baseUrl: string
 ): JobCard | null {
   const $el = $(el);
 
-  // externalId from jid (preferred) or from the article id attribute
-  const articleId = $el.attr('id') ?? ''; // e.g. "job-card-1tQzxcscEft2Su_wDcZLow"
-  const externalId = jid ?? articleId.replace('job-card-', '');
+  const articleId  = $el.attr('id') ?? '';
+  const externalId = articleId.replace('job-card-', '');
   if (!externalId) return null;
 
   const title   = $el.find(SELECTORS.cardTitle).first().attr('aria-label')?.trim() ?? '';
   const company = $el.find(SELECTORS.cardCompany).first().text().trim();
-
-  // Location: link text + optional " · On-site +1" span
-  const locationBase = $el.find(SELECTORS.cardLocation).first().text().trim();
-  const locationSuffix = $el.find(SELECTORS.cardLocationSpan).first().text().trim();
-  const location = locationSuffix ? `${locationBase}${locationSuffix}` : locationBase;
-
   if (!title || !company) return null;
 
-  // Salary: find a <p> matching currency/K pattern
+  const locationBase   = $el.find(SELECTORS.cardLocation).first().text().trim();
+  const locationSuffix = $el.find(SELECTORS.cardLocationSpan).first().text().trim();
+  const location       = locationSuffix ? `${locationBase}${locationSuffix}` : locationBase;
+
   const salaryRaw = $el.find('p.text-body-md').toArray()
     .map((n) => $(n).text().trim())
     .find((t) => /\$|\d+[Kk]\/yr/.test(t)) ?? null;
 
-  // Quick apply
   const quickApply = $el.find(SELECTORS.quickApplyBadge).toArray()
     .some((n) => $(n).text().trim().toLowerCase().includes('quick apply'));
 
+  // Build URL: current listing page + lk=matchToken
+  const url = new URL(baseUrl);
+  url.searchParams.set('lk', externalId);
+
   return {
     source: 'ziprecruiter' as const,
-    url: 'rodo',
+    url: url.toString(),
     externalId,
     title,
     company,
