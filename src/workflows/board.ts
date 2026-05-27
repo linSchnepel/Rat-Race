@@ -1,5 +1,7 @@
+// Workflows for job board sites like linkedin
+
 import { initBrowser, closeBrowser } from '../browser.js';
-import { ensureIndeedSession } from '../auth/verify.js';
+import { ensureLinkedInSession, ensureIndeedSession, ensureZiprecruiterSession } from '../auth/verify.js';
 import { fetchAndHydrateAllCards } from '../sources/indeed.js';
 import { filterCards } from '../core/filters.js';
 import { dedupeCards, dedupeJobs, dedupeAgainstHistory } from '../core/dedupe.js';
@@ -10,6 +12,36 @@ import type { JobCard } from '../core/types.js';
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export async function runLinkedInWorkflow(urls: [string, string]): Promise<void> {
+  if (!urls || (urls.length != 2)  ) { // TODO: make this array dynamic
+    throw new Error('LINKEDIN_SEARCH_URL is not set in your environment.');
+  }
+
+  logger.info('Starting LinkedIn job scout…');
+
+  await initBrowser({
+    headless: process.env['HEADLESS'] !== 'false',
+    timezone: process.env['TZ'] ?? 'America/Chicago',
+    source: 'linkedin'
+  });
+
+  try {
+    await ensureLinkedInSession();
+
+    try {
+      await runOnce(urls[0]);
+      await delay(100000);
+      await runOnce(urls[1]);
+    } catch (err) {
+      logger.error('Initial poll cycle failed — will retry on next interval', err);
+    }
+
+  } finally {
+    await closeBrowser();
+    logger.info('Browser closed. Goodbye.');
+  }
 }
 
 export async function runIndeedWorkflow(url: string): Promise<void> {
@@ -28,6 +60,35 @@ export async function runIndeedWorkflow(url: string): Promise<void> {
 
   try {
     await ensureIndeedSession();
+
+    try {
+      await runOnce(url);
+    } catch (err) {
+      logger.error('Initial poll cycle failed — will retry on next interval', err);
+    }
+
+  } finally {
+    await closeBrowser();
+    logger.info('Browser closed. Goodbye.');
+  }
+}
+
+export async function runZiprecruiterWorkflow(url: string): Promise<void> {
+  if (!url) {
+    throw new Error('ZIPRECRUITER_SEARCH_URL is not set in your environment.');
+  }
+
+  logger.info('Starting Ziprecruiter job scout…');
+
+  // include source string here
+
+  await initBrowser({
+    headless: process.env['HEADLESS'] !== 'false',
+    timezone: process.env['TZ'] ?? 'America/Chicago',
+    source: 'ziprecruiter'});
+
+  try {
+    await ensureZiprecruiterSession();
 
     try {
       await runOnce(url);

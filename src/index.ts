@@ -1,8 +1,6 @@
 import 'dotenv/config';
-import { runLinkedInWorkflow } from './workflows/linkedin.js';
+import { runLinkedInWorkflow, runIndeedWorkflow, runZiprecruiterWorkflow } from './workflows/board.js';
 import { logger } from './utils/logger.js';
-import { runIndeedWorkflow } from './workflows/indeed.ts';
-import { runZiprecruiterWorkflow } from './workflows/ziprecruiter.ts';
 
 // TODO: Loop instead of harcode these select values
 const SEARCH_URL = process.env['LINKEDIN_SEARCH_URL'] ?? '';
