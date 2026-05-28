@@ -1,7 +1,3 @@
-/**
- * Patterns that strongly indicate a staffing agency or recruiter posting.
- * Applied to company names and job titles.
- */
 const RECRUITER_COMPANY_PATTERNS: RegExp[] = [
   /\bstaffing\b/i,
   /\brecruiting\b/i,
@@ -31,10 +27,6 @@ const RECRUITER_TITLE_PATTERNS: RegExp[] = [
   /\bsourcer\b/i,
 ];
 
-/**
- * Return true if the company name or job title suggests a recruiter/staffing post.
- * This is a heuristic — false positives are possible. Adjust patterns as needed.
- */
 export function isRecruiterLike(company: string, title: string): boolean {
   return (
     RECRUITER_COMPANY_PATTERNS.some((p) => p.test(company)) ||
@@ -42,22 +34,28 @@ export function isRecruiterLike(company: string, title: string): boolean {
   );
 }
 
-/**
- * Score how "recruiter-like" a job looks, 0–100.
- * Higher = more suspicious.
- */
 export function recruiterScore(company: string, title: string, description: string): number {
   let score = 0;
 
   if (RECRUITER_COMPANY_PATTERNS.some((p) => p.test(company))) score += 50;
   if (RECRUITER_TITLE_PATTERNS.some((p) => p.test(title))) score += 30;
 
-  // Description red flags
   const descLower = description.toLowerCase();
-  if (descLower.includes('our client')) score += 15;
-  if (descLower.includes('on behalf of')) score += 10;
-  if (descLower.includes('contract to hire')) score += 5;
-  if (descLower.includes('w2') || descLower.includes('c2c')) score += 5;
+  if (descLower.includes('our client')) {
+    score += 15;
+  }
+
+  if (descLower.includes('on behalf of')) {
+    score += 10;
+  }
+
+  if (descLower.includes('contract to hire')) {
+    score += 5;
+  }
+  
+  if (descLower.includes('w2') || descLower.includes('c2c')) {
+    score += 5;
+  }
 
   return Math.min(score, 100);
 }

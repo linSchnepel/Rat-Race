@@ -6,22 +6,24 @@ export interface SalaryRange {
   raw: string;
 }
 
-/**
- * Parse a salary string into a structured range.
- * Returns null if no salary can be extracted.
- */
 export function parseSalary(raw: string): SalaryRange | null {
-  if (!raw) return null;
+  if (!raw) {
+    return null;
+  }
 
   const text = raw.trim();
   const currency = /USD|CAD|GBP|EUR/i.exec(text)?.[0]?.toUpperCase() ?? 'USD';
   const period = detectPeriod(text);
+  // TODO: deal with 401k
 
-  // Extract all numeric values — handles $180K, $114,100.00, 127000
+  // Handles $180K, $114,100.00, 127000
   const numbers = extractNumbers(text);
-  if (numbers.length === 0) return null;
 
-  // Detect range separator: -, –, to, and
+  if (numbers.length === 0) {
+    return null;
+  }
+
+  // -, –, to, and
   const hasRange = /[\-–]|(\bto\b)|(\band\b)/i.test(text);
 
   return {
@@ -34,8 +36,7 @@ export function parseSalary(raw: string): SalaryRange | null {
 }
 
 export function formatSalary(s: SalaryRange): string {
-  const fmt = (n: number) =>
-    n >= 1000 ? `$${(n / 1000).toFixed(0)}K` : `$${n}`;
+  const fmt = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(0)}K` : `$${n}`;
 
   const range = s.max ? `${fmt(s.min)} – ${fmt(s.max)}` : fmt(s.min);
   const period = s.period === 'hour' ? '/hr' : s.period === 'month' ? '/mo' : s.period === 'year' ? '/yr' : '';
@@ -44,7 +45,7 @@ export function formatSalary(s: SalaryRange): string {
 }
 
 function extractNumbers(text: string): number[] {
-  // Match patterns like: $114,100.00 | $180K | 127000 | 193,975
+  // $114,100.00 | $180K | 127000 | 193,975
   const pattern = /\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*([Kk])?/g;
   const results: number[] = [];
   let match: RegExpExecArray | null;
@@ -53,16 +54,24 @@ function extractNumbers(text: string): number[] {
     const digits = parseFloat(match[1]!.replace(/,/g, ''));
     const multiplier = match[2] ? 1000 : 1;
     const value = digits * multiplier;
-    // Sanity check: ignore values that look like years (2024) or percents
-    if (value >= 1000) results.push(value);
+
+    // Iignore values that look like years (2024) or percents
+    if (value >= 1000) {
+      results.push(value);
+    }
   }
 
   return results;
 }
 
 function detectPeriod(text: string): SalaryRange['period'] {
-  if (/\/hr|per hour|an hour|hourly/i.test(text)) return 'hour';
-  if (/\/mo|per month|monthly/i.test(text))        return 'month';
-  if (/\/yr|per year|a year|annual|salary/i.test(text)) return 'year';
-  return 'unknown';
+  if (/\/hr|per hour|an hour|hourly/i.test(text)) {
+    return 'hour';
+  } else if (/\/mo|per month|monthly/i.test(text)) {
+    return 'month';
+  } else if (/\/yr|per year|a year|annual|salary/i.test(text)) {
+    return 'year';
+  } else {
+    return 'unknown';
+  }
 }

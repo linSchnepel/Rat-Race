@@ -9,10 +9,6 @@ import { nowIso, randomDelay } from '../utils/dates.js';
 import { logger } from '../utils/logger.js';
 import type { JobCard, JobRecord } from '../core/types.js';
 
-// ---------------------------------------------------------------------------
-// Selectors
-// ---------------------------------------------------------------------------
-
 const SELECTORS = {
   // Left pane
   cardContainer:    'article[id^="job-card-"]',
@@ -41,14 +37,11 @@ const SELECTORS = {
   paginationNext:   'a[title="Next Page"]',
 };
 
-// ---------------------------------------------------------------------------
-// Main export
-// ---------------------------------------------------------------------------
-
 export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRecord[]> {
   const listPage = await getPage();
   const detailPage = await getPage();
   const allJobs: JobRecord[] = [];
+
   let currentUrl = searchUrl;
   let pageNum = 1;
 
@@ -76,7 +69,10 @@ export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRec
       for (const card of cards) {
         try {
           const job = await hydrateViaDetailPage(detailPage, card, currentUrl);
-          if (job) allJobs.push(job);
+
+          if (job) {
+            allJobs.push(job);
+          }
         } catch (err) {
           logger.warn(`ZipRecruiter hydration failed for ${card.externalId}: ${err instanceof Error ? err.message : String(err)}`);
         }
@@ -102,10 +98,6 @@ export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRec
   return allJobs;
 }
 
-// ---------------------------------------------------------------------------
-// Left pane scroll
-// ---------------------------------------------------------------------------
-
 async function scrollLeftPane(page: Page): Promise<void> {
   const MAX_SCROLLS = 20;
   const SCROLL_PX   = 600;
@@ -129,10 +121,6 @@ async function scrollLeftPane(page: Page): Promise<void> {
   await page.waitForTimeout(800);
 }
 
-// ---------------------------------------------------------------------------
-// Left pane parsing
-// ---------------------------------------------------------------------------
-
 interface ParseResult {
   cards: JobCard[];
   jobIdMap: Map<string, string>; // cardId -> jid
@@ -144,11 +132,13 @@ function parseListingCards(html: string, baseUrl: string): ParseResult {
   const fetchedAt = nowIso();
 
   // Only parse the desktop cards (hidden md:block) to avoid duplicates
-  // Each card appears twice in HTML (mobile + desktop) target the desktop wrapper
   $('div.hidden.md\\:block article[id^="job-card-"]').each((i, el) => {
     try {
       const card = parseCard($, el, fetchedAt, baseUrl);
-      if (card) cards.push(card);
+
+      if (card) {
+        cards.push(card);
+      }
     } catch (err) {
       logger.debug(`ZipRecruiter card parse error: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -157,21 +147,20 @@ function parseListingCards(html: string, baseUrl: string): ParseResult {
   return { cards, jobIdMap: new Map() };
 }
 
-function parseCard(
-  $: ReturnType<typeof load>,
-  el: ReturnType<typeof $>[0],
-  fetchedAt: string,
-  baseUrl: string
-): JobCard | null {
+function parseCard($: ReturnType<typeof load>, el: ReturnType<typeof $>[0], fetchedAt: string, baseUrl: string): JobCard | null {
   const $el = $(el);
 
   const articleId  = $el.attr('id') ?? '';
   const externalId = articleId.replace('job-card-', '');
-  if (!externalId) return null;
+  if (!externalId) {
+    return null;
+  }
 
   const title   = $el.find(SELECTORS.cardTitle).first().attr('aria-label')?.trim() ?? '';
   const company = $el.find(SELECTORS.cardCompany).first().text().trim();
-  if (!title || !company) return null;
+  if (!title || !company) {
+    return null;
+  }
 
   const locationBase   = $el.find(SELECTORS.cardLocation).first().text().trim();
   const locationSuffix = $el.find(SELECTORS.cardLocationSpan).first().text().trim();
@@ -202,10 +191,6 @@ function parseCard(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Right pane hydration
-// ---------------------------------------------------------------------------
-
 async function hydrateViaDetailPage(page: Page, card: JobCard, listingUrl: string): Promise<JobRecord | null> {
   logger.debug(`ZipRecruiter: hydrating ${card.externalId} — ${card.title}`);
 
@@ -218,33 +203,13 @@ async function hydrateViaDetailPage(page: Page, card: JobCard, listingUrl: strin
     .catch(() => logger.debug(`ZipRecruiter: detail pane timeout for ${card.externalId}`));
 
   const html = await page.content().catch(() => '');
-  if (!html) return null;
+
+  if (!html) {
+    return null;
+  }
 
   return parseDetailPane(card, html);
 }
-
-async function hydrateViaPanel(page: Page, card: JobCard): Promise<JobRecord | null> {
-  logger.debug(`ZipRecruiter: navigating to job ${card.externalId} — ${card.title}`);
-
-  // ZipRecruiter loads the right pane by setting lk= to the card's match token.
-  // The externalId IS the match token (from article id minus "job-card-" prefix).
-  const currentUrl = new URL(page.url());
-  currentUrl.searchParams.set('lk', card.externalId);
-
-  await page.goto(currentUrl.toString(), { waitUntil: 'domcontentloaded', timeout: 30_000 });
-
-  await page.waitForSelector(SELECTORS.detailDescription, { timeout: 10_000 })
-    .catch(() => logger.debug(`ZipRecruiter: detail pane timeout for ${card.externalId}`));
-
-  const html = await page.content().catch(() => '');
-  if (!html) return null;
-
-  return await parseDetailPane(card, html);
-}
-
-// ---------------------------------------------------------------------------
-// Right pane parsing
-// ---------------------------------------------------------------------------
 
 async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord | null> {
   const $ = load(html);
@@ -277,10 +242,8 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
     /\d+\s+(minute|hour|day|week)s?\s+ago/i.test(t) || /posted/i.test(t)
   ) ?? null;
 
-  // Apply URL
   const applyUrl = scrollContainer.find('a[aria-label="Apply"]').first().attr('href') ?? null;
 
-  // Salary: prefer card teaser (already extracted), fall back to description
   const salaryRaw = card.teaser || null;
   const salary = salaryRaw ? parseSalary(salaryRaw) : null;
 
@@ -288,7 +251,8 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
   const isRemote = /remote/i.test(locationRaw) || /remote/i.test(locationNormalized);
 
   const { matched, standout } = await matchSkills(descriptionText ?? '');
-  const now         = nowIso();
+
+  const now = nowIso();
   const fingerprint = buildFingerprint({
     source: 'ziprecruiter',
     externalId: card.externalId,
@@ -339,13 +303,12 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
   };
 }
 
-// ---------------------------------------------------------------------------
-// Pagination
-// ---------------------------------------------------------------------------
-
 function getNextPageUrl(html: string): string | null {
   const $ = load(html);
   const href = $(SELECTORS.paginationNext).attr('href');
-  if (!href) return null;
+  if (!href) {
+    return null;
+  }
+  
   return href.startsWith('http') ? href : `https://www.ziprecruiter.com${href}`;
 }

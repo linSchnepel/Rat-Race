@@ -9,9 +9,7 @@ interface FingerprintInput {
 }
 
 /**
- * Build a stable fingerprint for a job.
- *
- * Primary key: source + externalId — guaranteed unique per platform.
+ * Primary key: source + externalId
  * The company + title are folded in so that if LinkedIn reuses an ID
  * across a true re-post, the fingerprint still differs.
  */
@@ -26,10 +24,7 @@ export function buildFingerprint(input: FingerprintInput): string {
   return createHash('sha256').update(parts).digest('hex').slice(0, 20);
 }
 
-/**
- * Build a "fuzzy" fingerprint that ignores the external ID.
- * Used to detect republished jobs posted under a new ID by the same company.
- */
+// Ignores the external ID
 export function buildFuzzyFingerprint(input: Omit<FingerprintInput, 'externalId'>): string {
   const parts = [
     input.source,

@@ -12,13 +12,13 @@ import type { JobCard, JobRecord } from '../core/types.js';
 const SELECTORS = {
   // Left pane
   cardContainer:  'li:has(div.job_seen_beacon)',
-  cardLink:       'a.jcs-JobTitle[data-jk]',       // organic only — has data-jk
-  cardTitle:      'a.jcs-JobTitle span[title]',     // span[title] has clean text
+  cardLink:       'a.jcs-JobTitle[data-jk]',
+  cardTitle:      'a.jcs-JobTitle span[title]',
   cardCompany:    'span[data-testid="company-name"]',
   cardLocation:   'div[data-testid="text-location"] span',
-  cardSalary:     'span.css-zydy3i',                // inside salary-snippet li
+  cardSalary:     'span.css-zydy3i',
 
-  // Right pane (loaded when vjk= param is active)
+  // Right pane
   detailPane:       'div.jobsearch-RightPane',
   detailTitle:      'h2[data-testid="jobsearch-JobInfoHeader-title"] span:not(.visually-hidden)',
   detailCompany:    'div[data-testid="inlineHeader-companyName"] span',
@@ -28,13 +28,10 @@ const SELECTORS = {
   detailDescription:'div#jobDescriptionText',
 };
 
-// ---------------------------------------------------------------------------
-// Main export
-// ---------------------------------------------------------------------------
-
 export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRecord[]> {
   const page = await getPage();
   const allJobs: JobRecord[] = [];
+
   let currentUrl : string | null = searchUrl;
   let pageNum = 1;
 
@@ -61,14 +58,17 @@ export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRec
       for (const card of cards) {
         try {
           const job = await hydrateViaPanel(page, card, currentUrl);
-          if (job) allJobs.push(job);
+
+          if (job) {
+            allJobs.push(job);
+          }
         } catch (err) {
           logger.warn(`Indeed hydration failed for ${card.externalId}: ${err instanceof Error ? err.message : String(err)}`);
         }
+
         await randomDelay(4_000, 8_500);
       }
 
-      // Pagination: Indeed uses ?start=N in the URL, not a JS button
       const nextUrl = await clickNextPage( page);
       if (!nextUrl) {
         logger.info('Indeed: no more pages.');
@@ -86,10 +86,6 @@ export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRec
   return allJobs;
 }
 
-// ---------------------------------------------------------------------------
-// Left pane parsing
-// ---------------------------------------------------------------------------
-
 function parseListingCards(html: string): JobCard[] {
   const $ = load(html);
   const cards: JobCard[] = [];
@@ -98,7 +94,10 @@ function parseListingCards(html: string): JobCard[] {
   $(SELECTORS.cardContainer).each((_i, el) => {
     try {
       const card = parseCard($, el, fetchedAt);
-      if (card) cards.push(card);
+
+      if (card) {
+        cards.push(card);
+      }
     } catch (err) {
       logger.debug(`Indeed card parse error: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -107,23 +106,21 @@ function parseListingCards(html: string): JobCard[] {
   return cards;
 }
 
-function parseCard(
-  $: ReturnType<typeof load>,
-  el: ReturnType<typeof $>[0],
-  fetchedAt: string
-): JobCard | null {
+function parseCard($: ReturnType<typeof load>, el: ReturnType<typeof $>[0], fetchedAt: string): JobCard | null {
   const $el = $(el);
 
-  // data-jk only exists on organic cards — sponsored cards have no data-jk
   const externalId = $el.find(SELECTORS.cardLink).attr('data-jk')?.trim() ?? '';
-  if (!externalId) return null; // skip sponsored
+  if (!externalId) {
+    return null; // skip sponsored
+  }
 
-  const title   = $el.find(SELECTORS.cardTitle).attr('title')?.trim()
-               ?? $el.find(SELECTORS.cardTitle).text().trim();
+  const title   = $el.find(SELECTORS.cardTitle).attr('title')?.trim() ?? $el.find(SELECTORS.cardTitle).text().trim();
   const company = $el.find(SELECTORS.cardCompany).text().trim();
   const location = $el.find(SELECTORS.cardLocation).text().trim();
 
-  if (!title || !company) return null;
+  if (!title || !company) {
+    return null;
+  }
 
   const salaryRaw = $el.find(SELECTORS.cardSalary).first().text().trim() || null;
   const url = `https://www.indeed.com/viewjob?jk=${externalId}`;
@@ -135,34 +132,28 @@ function parseCard(
     title,
     company,
     location,
-    teaser: salaryRaw, // reuse teaser to carry salary text into hydration
+    teaser: salaryRaw,
     easyApply: $el.find('span:contains("Easily apply")').length > 0,
     boosted: false,
     fetchedAt,
   };
 }
 
-// ---------------------------------------------------------------------------
-// Left panel — scroll to load all cards
-// ---------------------------------------------------------------------------
 async function scrollJobList(page: Page): Promise<void> {
   const MAX_SCROLLS = 20;
-  const SCROLL_PX   = 600;
-  const TICK_MS     = 300;
+  const SCROLL_PX = 600;
+  const TICK_MS = 300;
 
-  // div.mosaic-zone is the actual scrolling container for the left panel.
   const listPanel = page.locator('div.mosaic-zone').first();
   const box = await listPanel.boundingBox().catch(() => null);
 
   if (!box) {
-    logger.warn('Could not find mosaic-zone bounding box — scroll skipped.');
+    logger.warn('Could not find mosaic-zone bounding box. Scroll skipped.');
     return;
   }
 
-  // Position the mouse in the upper-centre of the list panel so wheel events
-  // are captured by this scroll container and not the detail pane.
   const targetX = box.x + box.width / 2;
-  const targetY = box.y + 100; // near the top, clearly inside the list panel
+  const targetY = box.y + 100;
   await page.mouse.move(targetX, targetY);
 
   for (let i = 0; i < MAX_SCROLLS; i++) {
@@ -170,23 +161,16 @@ async function scrollJobList(page: Page): Promise<void> {
     await page.waitForTimeout(TICK_MS);
   }
 
-  // Final pause to let the last batch of lazy-loaded cards render.
   await page.waitForTimeout(800);
 }
-
-// ---------------------------------------------------------------------------
-// Right pane hydration — click card, read detail div
-// ---------------------------------------------------------------------------
 
 async function hydrateViaPanel(page: Page, card: JobCard, baseUrl: string): Promise<JobRecord | null> {
   logger.debug(`Indeed: clicking card ${card.externalId} — ${card.title}`);
 
-  // Click the job title link in the left pane
   const cardLocator = page.locator(`a[data-jk="${card.externalId}"]`).first();
   await cardLocator.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
   await cardLocator.click({ timeout: 5_000 });
 
-  // Wait for the right pane description to load
   await page.waitForSelector(SELECTORS.detailDescription, { timeout: 10_000 })
     .catch(() => logger.debug(`Indeed: detail pane timeout for ${card.externalId}`));
 
@@ -195,10 +179,6 @@ async function hydrateViaPanel(page: Page, card: JobCard, baseUrl: string): Prom
 
   return await parseDetailPane(card, html);
 }
-
-// ---------------------------------------------------------------------------
-// Right pane parsing
-// ---------------------------------------------------------------------------
 
 async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord | null> {
   const $ = load(html);
@@ -210,7 +190,6 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
   const descriptionHtml = $(SELECTORS.detailDescription).html()?.trim() ?? null;
   const descriptionText = $(SELECTORS.detailDescription).text().replace(/\s+/g, ' ').trim() || null;
 
-  // Salary: prefer detail pane, fall back to card teaser
   const salaryRaw = $(SELECTORS.detailSalary).first().text().trim() || card.teaser || null;
   const salary = salaryRaw ? parseSalary(salaryRaw) : null;
 
@@ -268,29 +247,27 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
   };
 }
 
-// ---------------------------------------------------------------------------
-// Pagination — URL-based (start=N), not a button. But navigate via <a> click instead of goto
-// ---------------------------------------------------------------------------
-
 function getNextPageUrl(html: string): string | null {
   const $ = load(html);
 
-  // Indeed pagination links: <a> with aria-label="Next Page" or data-testid="pagination-page-next"
-  const nextHref = $('a[data-testid="pagination-page-next"]').attr('href')
-                ?? $('a[aria-label="Next Page"]').attr('href');
+  // <a> with aria-label="Next Page" or data-testid="pagination-page-next"
+  const nextHref = $('a[data-testid="pagination-page-next"]').attr('href') ?? $('a[aria-label="Next Page"]').attr('href');
 
-  if (!nextHref) return null;
+  if (!nextHref) {
+    return null;
+  }
 
   // href is relative like /jobs?q=...&start=10
-  return nextHref.startsWith('http')
-    ? nextHref
-    : `https://www.indeed.com${nextHref}`;
+  return nextHref.startsWith('http') ? nextHref : `https://www.indeed.com${nextHref}`;
 }
 
 async function clickNextPage(page: Page): Promise<string | null> {
   const nextLink = page.locator('a[data-testid="pagination-page-next"]').first();
   const isVisible = await nextLink.isVisible().catch(() => false);
-  if (!isVisible) return null;
+  
+  if (!isVisible) {
+    return null;
+  }
 
   await nextLink.scrollIntoViewIfNeeded();
   await randomDelay(500, 1_500);

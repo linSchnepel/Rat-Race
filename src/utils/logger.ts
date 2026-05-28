@@ -43,8 +43,10 @@ export const logger = {
   error(msg: string, err?: unknown): void {
     if (shouldLog('error')) {
       console.error(chalk.red(`[${timestamp()}] ERROR ${msg}`));
+
       if (err instanceof Error) {
         console.error(chalk.red(`       ${err.message}`));
+        
         if (err.stack && LOG_LEVEL === 'debug') {
           console.error(chalk.gray(err.stack));
         }

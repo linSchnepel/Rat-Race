@@ -6,12 +6,7 @@ interface MatchResult {
   standout: string[];
 }
 
-/**
- * Match skills from a job description text against the configured skill list.
- * Returns matched skill names and the subset marked as standout.
- *
- * Skills file is loaded fresh each call so hot-edits take effect next poll.
- */
+//Match skills from a job description text against the configured skill list
 export async function matchSkills(descriptionText: string): Promise<MatchResult> {
   const config = await loadSkills();
   const haystack = normalizeText(descriptionText);
@@ -22,14 +17,17 @@ export async function matchSkills(descriptionText: string): Promise<MatchResult>
   for (const skill of config.skills) {
     const terms = [skill.name, ...skill.aliases].map(normalizeText);
     const found = terms.some((term) => {
-      // Word-boundary match to avoid "Java" matching "JavaScript"
+      // Word-boundary match
       const pattern = new RegExp(`\\b${escapeRegex(term)}\\b`);
       return pattern.test(haystack);
     });
 
     if (found) {
       matched.push(skill.name);
-      if (skill.standout) standout.push(skill.name);
+      
+      if (skill.standout) {
+        standout.push(skill.name);
+      }
     }
   }
 

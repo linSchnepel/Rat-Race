@@ -7,9 +7,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SESSION_FILE = join(__dirname, '../../data/state.json');
 
 export interface SessionState {
-  /** Unix ms timestamp of the last successful /feed verification. */
+  // Unix ms timestamp
   lastVerified: number | null;
-  /** Short hash of the li_at cookie at last verification. Used to detect rotation. */
   cookieHash: string | null;
 }
 
@@ -22,12 +21,11 @@ export async function loadSessionState(): Promise<SessionState> {
   try {
     const raw = await readFile(SESSION_FILE, 'utf-8');
     const parsed = JSON.parse(raw) as Partial<SessionState>;
-    return {
-      lastVerified: parsed.lastVerified ?? null,
-      cookieHash: parsed.cookieHash ?? null,
+
+    return {lastVerified: parsed.lastVerified ?? null, cookieHash: parsed.cookieHash ?? null,
     };
   } catch {
-    // File doesn't exist yet — return defaults.
+    // File doesn't exist yet
     return { ...DEFAULT_STATE };
   }
 }

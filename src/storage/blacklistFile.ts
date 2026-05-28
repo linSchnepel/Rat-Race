@@ -14,10 +14,14 @@ interface Blacklist {
 const DEFAULT_BLACKLIST: Blacklist = { companies: [], patterns: [] };
 
 export async function loadBlacklist(): Promise<Blacklist> {
-  if (!existsSync(BLACKLIST_FILE)) return { ...DEFAULT_BLACKLIST };
+  if (!existsSync(BLACKLIST_FILE)) {
+    return { ...DEFAULT_BLACKLIST };
+  }
+
   try {
     const raw = await readFile(BLACKLIST_FILE, 'utf-8');
     const parsed = JSON.parse(raw) as Partial<Blacklist>;
+
     return {
       companies: parsed.companies ?? [],
       patterns: parsed.patterns ?? [],
@@ -34,6 +38,7 @@ export async function saveBlacklist(blacklist: Blacklist): Promise<void> {
 
 export async function addToBlacklist(company: string): Promise<void> {
   const bl = await loadBlacklist();
+  
   if (!bl.companies.includes(company)) {
     bl.companies.push(company);
     await saveBlacklist(bl);

@@ -10,9 +10,13 @@ const SKILLS_FILE = join(__dirname, '../../data/skills.json');
 const DEFAULT_CONFIG: SkillConfig = { skills: [] };
 
 export async function loadSkills(): Promise<SkillConfig> {
-  if (!existsSync(SKILLS_FILE)) return { ...DEFAULT_CONFIG };
+  if (!existsSync(SKILLS_FILE)) {
+    return { ...DEFAULT_CONFIG };
+  }
+
   try {
     const raw = await readFile(SKILLS_FILE, 'utf-8');
+    
     return JSON.parse(raw) as SkillConfig;
   } catch {
     return { ...DEFAULT_CONFIG };

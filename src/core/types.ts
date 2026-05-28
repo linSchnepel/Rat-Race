@@ -5,31 +5,17 @@
 import { SalaryRange } from "../utils/salary.ts";
 
 export interface JobCard {
-  /** Source platform identifier */
   source: 'linkedin' | 'indeed' | 'ziprecruiter';
-  /** Canonical job URL (detail page) */
   url: string;
-  /** LinkedIn internal job ID parsed from the URL/card */
   externalId: string;
-  /** Display title from the card */
   title: string;
-  /** Company name as shown on the card */
   company: string;
-  /** Location string as shown on the card */
   location: string;
-  /** Short teaser text from the card, if present */
   teaser: string | null;
-  /** "Easy Apply" badge present on the card */
   easyApply: boolean;
-  /** Whether the card was marked as "Promoted" / "Boosted" */
   boosted: boolean;
-  /** ISO string of when this card was first seen in this run */
   fetchedAt: string;
 }
-
-// ---------------------------------------------------------------------------
-// Hydrated job record after visiting the detail page
-// ---------------------------------------------------------------------------
 
 export interface JobRecord {
   // Identity
@@ -78,14 +64,10 @@ export interface JobRecord {
 
   salary: SalaryRange | null;
 
-  // Metrics (best-effort; may be null if LinkedIn hides them)
+  // Metrics
   applicantCount: string | null;
   postedAge: string | null;
 }
-
-// ---------------------------------------------------------------------------
-// Config / filter types
-// ---------------------------------------------------------------------------
 
 export interface FilterConfig {
   blacklistedCompanies: string[];

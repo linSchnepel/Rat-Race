@@ -2,7 +2,11 @@
 
 import { initBrowser, closeBrowser } from '../browser.js';
 import { ensureLinkedInSession, ensureIndeedSession, ensureZiprecruiterSession } from '../auth/verify.js';
-import { fetchAndHydrateAllCards } from '../sources/indeed.js';
+
+import { fetchAndHydrateAllCards as hydrateLinkedin } from '../sources/linkedin.js';
+import { fetchAndHydrateAllCards as hydrateIndeed } from '../sources/indeed.js';
+import { fetchAndHydrateAllCards as hydrateZiprecruiter } from '../sources/ziprecruiter.js';
+
 import { filterCards } from '../core/filters.js';
 import { dedupeCards, dedupeJobs, dedupeAgainstHistory } from '../core/dedupe.js';
 import { readJobs, appendJobs } from '../storage/jobsFile.js';
@@ -16,7 +20,7 @@ function delay(ms: number): Promise<void> {
 
 export async function runLinkedInWorkflow(urls: [string, string]): Promise<void> {
   if (!urls || (urls.length != 2)  ) { // TODO: make this array dynamic
-    throw new Error('LINKEDIN_SEARCH_URL is not set in your environment.');
+    throw new Error('LINKEDIN_SEARCH_URL is not set in the environment.');
   }
 
   logger.info('Starting LinkedIn job scout…');
@@ -31,13 +35,12 @@ export async function runLinkedInWorkflow(urls: [string, string]): Promise<void>
     await ensureLinkedInSession();
 
     try {
-      await runOnce(urls[0]);
+      await runOnce(urls[0], 'linkedin');
       await delay(100000);
-      await runOnce(urls[1]);
+      await runOnce(urls[1], 'linkedin');
     } catch (err) {
-      logger.error('Initial poll cycle failed — will retry on next interval', err);
+      logger.error('LinkedIn poll cycle failed.', err);
     }
-
   } finally {
     await closeBrowser();
     logger.info('Browser closed. Goodbye.');
@@ -46,15 +49,13 @@ export async function runLinkedInWorkflow(urls: [string, string]): Promise<void>
 
 export async function runIndeedWorkflow(url: string): Promise<void> {
   if (!url) {
-    throw new Error('INDEED_SEARCH_URL is not set in your environment.');
+    throw new Error('INDEED_SEARCH_URL is not set in the environment.');
   }
 
   logger.info('Starting Indeed job scout…');
 
-  // include source string here
-
   await initBrowser({
-    headless: process.env['HEADLESS'] !== 'false',
+    headless: false,
     timezone: process.env['TZ'] ?? 'America/Chicago',
     source: 'indeed'});
 
@@ -62,11 +63,10 @@ export async function runIndeedWorkflow(url: string): Promise<void> {
     await ensureIndeedSession();
 
     try {
-      await runOnce(url);
+      await runOnce(url, 'indeed');
     } catch (err) {
-      logger.error('Initial poll cycle failed — will retry on next interval', err);
+      logger.error('Indeed poll cycle failed.', err);
     }
-
   } finally {
     await closeBrowser();
     logger.info('Browser closed. Goodbye.');
@@ -80,8 +80,6 @@ export async function runZiprecruiterWorkflow(url: string): Promise<void> {
 
   logger.info('Starting Ziprecruiter job scout…');
 
-  // include source string here
-
   await initBrowser({
     headless: process.env['HEADLESS'] !== 'false',
     timezone: process.env['TZ'] ?? 'America/Chicago',
@@ -91,25 +89,22 @@ export async function runZiprecruiterWorkflow(url: string): Promise<void> {
     await ensureZiprecruiterSession();
 
     try {
-      await runOnce(url);
+      await runOnce(url, 'ziprecruiter');
     } catch (err) {
-      logger.error('Initial poll cycle failed — will retry on next interval', err);
+      logger.error('Ziprecruiter poll cycle failed.', err);
     }
-
   } finally {
     await closeBrowser();
     logger.info('Browser closed. Goodbye.');
   }
 }
 
-// This is... the exact same as linkedin. TODO
-async function runOnce(url: string): Promise<void> {
+async function runOnce(url: string, type: string): Promise<void> {
   logger.info('--- Starting new poll cycle ---');
   const cycleStart = Date.now();
 
-  // Fetch all pages and hydrate via the right panel — single browser session.
-  // Returns fully hydrated JobRecords; no separate hydration loop needed.
-  const allJobs = await fetchAndHydrateAllCards(url);
+  // Fetch all pages and hydrate, no separate loop
+  const allJobs = type === 'linkedin' ? await hydrateLinkedin(url) : type === 'indeed' ? await hydrateIndeed(url) : await hydrateZiprecruiter(url);
   logger.info(`Fetched and hydrated ${allJobs.length} jobs across all pages.`);
 
   if (allJobs.length === 0) {
@@ -117,8 +112,7 @@ async function runOnce(url: string): Promise<void> {
     return;
   }
 
-  // Card-level filtering — operate on JobRecords directly since we skipped
-  // the two-stage card/hydrate split. Cast to JobCard shape for the filter.
+  // Card-level filtering
   const cardStubs: JobCard[] = allJobs.map((j) => ({
     source: j.source,
     url: j.url,
@@ -137,11 +131,10 @@ async function runOnce(url: string): Promise<void> {
   const filteredJobs = allJobs.filter((j) => filteredIds.has(j.externalId));
   logger.info(`${filteredJobs.length} jobs survived filtering.`);
 
-  // Dedupe within this run.
   const dedupedJobs = dedupeJobs(filteredJobs);
   logger.info(`${dedupedJobs.length} jobs after in-run deduplication.`);
 
-  // Compare against historical jobs.jsonl.
+  //TODO: split history (jobs.jsonl) by website
   const history = await readJobs();
   const freshJobs = dedupeAgainstHistory(dedupedJobs, history);
   logger.info(`${freshJobs.length} new jobs not seen before.`);

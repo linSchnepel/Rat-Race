@@ -15,6 +15,7 @@ export function evaluateAlerts(job: JobRecord, rules: AlertRule[]): string[] {
       if (rule.minSalary && (!job.salary?.min || job.salary.min < rule.minSalary)) return false;
       if (rule.titleContains && !job.titleNormalized.includes(rule.titleContains.toLowerCase())) return false;
       if (rule.minStandoutSkills && job.skillsStandout.length < rule.minStandoutSkills) return false;
+      
       return true;
     })
     .map((r) => r.sound);

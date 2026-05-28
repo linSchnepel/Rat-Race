@@ -15,6 +15,7 @@ export async function loadRunState(): Promise<RunState> {
   try {
     const raw = await readFile(STATE_FILE, 'utf-8');
     const parsed = JSON.parse(raw) as Partial<RunState>;
+    
     return {
       lastRunAt: parsed.lastRunAt ?? null,
       lastCursor: parsed.lastCursor ?? null,
