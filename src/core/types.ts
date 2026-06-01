@@ -4,6 +4,13 @@
 
 import { SalaryRange } from "../utils/salary.ts";
 
+export interface CompanyRecord {
+  source: 'google';
+  companyName: string;
+  jobBoardUrl: string;
+  firstSeen: string;
+}
+
 export interface JobCard {
   source: 'linkedin' | 'indeed' | 'ziprecruiter';
   url: string;

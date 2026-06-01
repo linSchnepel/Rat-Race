@@ -20,4 +20,9 @@ export const adapters: Record<string, AuthAdapter> = {
     loginUrl: 'https://www.ziprecruiter.com/authn/login',
     waitForUrl: 'https://www.ziprecruiter.com/jobseeker/home',
   },
+  google: {
+    name: 'Google',
+    loginUrl: 'https://accounts.google.com/signin',
+    waitForUrl: 'https://myaccount.google.com/**',
+  },
 };

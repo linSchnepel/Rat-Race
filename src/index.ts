@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import { runLinkedInWorkflow, runIndeedWorkflow, runZiprecruiterWorkflow } from './workflows/board.js';
+
+import { runGoogleWorkflow } from './workflows/search.js';
 import { logger } from './utils/logger.js';
 
 // TODO: Loop instead of harcode these select values
@@ -8,6 +10,8 @@ const SEARCH_URL_REMOTE = process.env['LINKEDIN_SEARCH_URL_REMOTE'] ?? '';
 const SEARCH_URL_INDEED = process.env['INDEED_SEARCH_URL'] ?? '';
 const SEARCH_URL_ZIPRECRUITER = process.env['ZIPRECRUITER_SEARCH_URL'] ?? '';
 
+const GOOGLE_SEARCH_URL = process.env['GOOGLE_SEARCH_URL'] ?? '';
+//await runGoogleWorkflow([GOOGLE_SEARCH_URL]).catch((err) => { logger.error('Fatal error', err); process.exit(1); });
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }

@@ -16,7 +16,8 @@
     "setup":         "tsx scripts/setup-auth.ts",
     "setup:linkedin": "tsx scripts/setup-auth.ts linkedin",
     "setup:indeed":   "tsx scripts/setup-auth.ts indeed",
-    "setup:ziprecruiter": "tsx scripts/setup-auth.ts ziprecruiter"
+    "setup:ziprecruiter": "tsx scripts/setup-auth.ts ziprecruiter",
+    "setup:google": "tsx scripts/setup-auth.ts google"
   },
   "dependencies": {
     "chalk": "^5.6.2",
