@@ -1,6 +1,9 @@
 # Rat-Race
 This is a job board aggregator. It sources listings (LinkedIn, Indeed, Zip Recruiter, Ashby) and provides a notification of new jobs. It runs every hour and provides an auditory ping when new jobs have been listed.
 
+EXAMPLE:
+<img width="2274" height="1161" alt="image" src="https://github.com/user-attachments/assets/8971f34b-4064-45f3-b3f9-169edfefbacc" />
+
 ## Notable customization aspects
 - Can blacklist companies
 - The logger can highlight certain skills which are relevant to the user
