@@ -14,7 +14,6 @@ export function parseSalary(raw: string): SalaryRange | null {
   const text = raw.trim();
   const currency = /USD|CAD|GBP|EUR/i.exec(text)?.[0]?.toUpperCase() ?? 'USD';
   const period = detectPeriod(text);
-  // TODO: deal with 401k
 
   // Handles $180K, $114,100.00, 127000
   const numbers = extractNumbers(text);
@@ -45,32 +44,51 @@ export function formatSalary(s: SalaryRange): string {
 }
 
 function extractNumbers(text: string): number[] {
-  // $114,100.00 | $180K | 127000 | 193,975
-  const pattern = /\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*([Kk])?/g;
-  const results: number[] = [];
-  let match: RegExpExecArray | null;
+    // Tries to thoroughly clean non-salary numbers
+    const cleaned = text.replace(/\b401?/gi, '')
+      .replace(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g, '')
+      .replace(/\b\d{4}-\d{2}-\d{2}\b/g, '')
+      .replace(/\b\d+\s+months?\b/gi, '')
+      .replace(/\b\d+\s+roles?\b/gi, '')
+      .replace(/\b\d+\s+years?\s+(?!of\s+exp|exp)/gi, '')
+      .replace(/\bmaximum\s+of\s+\d+\b/gi, '')
+      .replace(/\bup\s+to\s+\d+\b/gi, '');
 
-  while ((match = pattern.exec(text)) !== null) {
-    const digits = parseFloat(match[1]!.replace(/,/g, ''));
-    const multiplier = match[2] ? 1000 : 1;
-    const value = digits * multiplier;
+    // Aggressively looks for only $, comma formatting, or k
+    const pattern = /\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*([Kk])?|(\d{1,3}(?:,\d{3})+(?:\.\d+)?)\s*([Kk])?|(\d+(?:\.\d+)?)\s*([Kk])\b/g;
+    const results: number[] = [];
+    let match: RegExpExecArray | null;
 
-    // Iignore values that look like years (2024) or percents
-    if (value >= 1000) {
-      results.push(value);
+    while ((match = pattern.exec(cleaned)) !== null) {
+      const digits = parseFloat(match[1]!.replace(/,/g, ''));
+      const multiplier = match[2] ? 1000 : 1;
+      const value = digits * multiplier;
+
+      if (value >= 10) {
+        results.push(value);
+      }
     }
-  }
 
-  return results;
+    return results;
 }
 
+// +- 30 character range
+function extractSalaryPhrase(text: string): string | null {
+  const pattern =
+    /(?:\$[\d,. ]+(?:[Kk])?(?:\s*[-–]\s*\$?[\d,. ]+(?:[Kk])?)?)\s*(?:per\s+)?(?:an?\s+)?(hour|hr|year|yr|month|mo|annually|hourly)\b|(?:per\s+|an?\s+)(hour|hr|year|yr|month|mo)\b[^.]{0,40}\$[\d,.]+/gi;
+
+  const match = pattern.exec(text);
+  return match ? match[0] : null;
+}
+
+// Explicitly checks for common period indicators
 function detectPeriod(text: string): SalaryRange['period'] {
-  if (/\/hr|per hour|an hour|hourly/i.test(text)) {
+  if (/\/\s*hr\b|per\s+hour|an?\s+hour|hourly|\$[\d,.]+\s*\/\s*h\b/i.test(text)) {
     return 'hour';
-  } else if (/\/mo|per month|monthly/i.test(text)) {
-    return 'month';
-  } else if (/\/yr|per year|a year|annual|salary/i.test(text)) {
+  } else if (/\/\s*yr\b|per\s+year|an?\s+year|annually|a\s+year/i.test(text)) {
     return 'year';
+  } else if (/\/\s*mo\b|per\s+month|an?\s+month/i.test(text)) {
+    return 'month';
   } else {
     return 'unknown';
   }

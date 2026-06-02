@@ -134,7 +134,6 @@ async function runOnce(url: string, type: string): Promise<void> {
   const dedupedJobs = dedupeJobs(filteredJobs);
   logger.info(`${dedupedJobs.length} jobs after in-run deduplication.`);
 
-  //TODO: split history (jobs.jsonl) by website
   const history = await readJobs();
   const freshJobs = dedupeAgainstHistory(dedupedJobs, history);
   logger.info(`${freshJobs.length} new jobs not seen before.`);

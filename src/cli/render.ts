@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import type { JobRecord } from '../core/types.js';
+import type { CompanyRecord, JobRecord } from '../core/types.js';
 import { formatSalary } from "../utils/salary.ts";
 import { evaluateAlerts } from '../core/alerts.ts';
 
@@ -28,7 +28,8 @@ function renderJob(job: JobRecord): void {
 
   const companyStr = chalk.bold.white(job.company);
   const titleStr = chalk.bold.yellow(job.title);
-  console.log(`${companyStr}  ${chalk.gray('—')}  ${titleStr}`);
+  const isStandout = highestPriority && highestPriority !== 'newJob' ? true : false;
+  console.log(`${companyStr}  ${chalk.gray('—')}  ${titleStr}` + (isStandout ? chalk.red(' ★') : ''));
 
   const locationStr = job.isRemote
     ? chalk.green('Remote') + (job.locationRaw ? chalk.gray(` · ${job.locationRaw}`) : '')
@@ -41,7 +42,7 @@ function renderJob(job: JobRecord): void {
   // Meta row
   const meta: string[] = [];
   if (job.employmentType) meta.push(job.employmentType);
-  if (job.experienceLevel) meta.push(job.experienceLevel);
+  if (job.experience) meta.push(job.experience.raw);
   if (job.easyApply) meta.push(chalk.cyan('Easy Apply'));
   if (job.isBoosted) meta.push(chalk.dim('Promoted'));
   if (job.applicantCount) meta.push(chalk.dim(job.applicantCount));
@@ -67,4 +68,14 @@ function renderJob(job: JobRecord): void {
   // console.log(`  ${chalk.cyan(osc8Link)}`);
 
   console.log(DIVIDER);
+}
+
+export function renderCompanies(companies: CompanyRecord[]): void {
+  console.info(chalk.cyan(`\n ${companies.length} new compan${companies.length === 1 ? 'y' : 'ies'} found\n`));
+
+  for (const c of companies) {
+    console.log(`  ${c.companyName}`);
+    console.log(`  ${chalk.underline.gray(c.jobBoardUrl)}`);
+    console.log(DIVIDER);
+  }
 }

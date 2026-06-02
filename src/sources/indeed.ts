@@ -8,6 +8,7 @@ import { parseSalary } from '../utils/salary.js';
 import { nowIso, randomDelay } from '../utils/dates.js';
 import { logger } from '../utils/logger.js';
 import type { JobCard, JobRecord } from '../core/types.js';
+import { parseExperience } from '../utils/experience.ts';
 
 const SELECTORS = {
   // Left pane
@@ -190,6 +191,7 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
   const descriptionHtml = $(SELECTORS.detailDescription).html()?.trim() ?? null;
   const descriptionText = $(SELECTORS.detailDescription).text().replace(/\s+/g, ' ').trim() || null;
 
+  const experience = parseExperience(descriptionText ?? '');
   const salaryRaw = $(SELECTORS.detailSalary).first().text().trim() || card.teaser || null;
   const salary = salaryRaw ? parseSalary(salaryRaw) : null;
 
@@ -220,7 +222,6 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
     title,
     titleNormalized: normalizeTitle(title),
     employmentType,
-    experienceLevel: null,
 
     locationRaw,
     locationNormalized,
@@ -237,6 +238,7 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
     isRepublished: false,
     legitimacyScore: 100,
 
+    experience,
     salary,
     skillsExtracted: [],
     skillsMatched: matched,

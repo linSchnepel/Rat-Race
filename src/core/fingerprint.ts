@@ -8,11 +8,8 @@ interface FingerprintInput {
   title: string;
 }
 
-/**
- * Primary key: source + externalId
- * The company + title are folded in so that if LinkedIn reuses an ID
- * across a true re-post, the fingerprint still differs.
- */
+// Primary key: source + externalId
+// The company + title are folded in so that if LinkedIn reuses an ID across a re-post, the fingerprint still differs.
 export function buildFingerprint(input: FingerprintInput): string {
   const parts = [
     input.source,

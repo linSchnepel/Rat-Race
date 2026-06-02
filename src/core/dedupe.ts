@@ -1,4 +1,4 @@
-import { buildFingerprint, buildFuzzyFingerprint } from './fingerprint.js';
+import { buildFuzzyFingerprint } from './fingerprint.js';
 import { logger } from '../utils/logger.js';
 import type { JobCard, JobRecord } from './types.js';
 

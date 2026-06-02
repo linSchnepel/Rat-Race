@@ -18,5 +18,6 @@ export function playTone(tones: Array<[number, number]>): void {
 
 export const sounds = {
   newJob:      () => beep(880, 200),
+  noticeMe:    () => beep(660, 200),
   authError:   () => playTone([[400, 200], [300, 400]]), // descending = bad
 };

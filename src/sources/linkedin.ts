@@ -9,6 +9,7 @@ import { logger } from '../utils/logger.js';
 import type { JobCard, JobRecord } from '../core/types.js';
 import { readJobs } from '../storage/jobsFile.js';
 import { parseSalary } from '../utils/salary.js';
+import { parseExperience } from '../utils/experience.ts';
 
 const SELECTORS = {
   // Left panel
@@ -259,6 +260,8 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
   const salaryPill = pills.find((p) => /\$|\d+[Kk]/.test(p)) ?? null;
   const salary = salaryPill ? parseSalary(salaryPill) : parseSalary(descriptionText ?? '');
 
+  const experience = parseExperience(descriptionText ?? '');
+
   const employmentType =
     pills.find((p) => /^(full.time|part.time|contract|temporary|internship|volunteer|other)$/i.test(p)) ?? null;
 
@@ -291,7 +294,6 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
     title,
     titleNormalized,
     employmentType,
-    experienceLevel: null,
 
     locationRaw,
     locationNormalized,
@@ -312,6 +314,7 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
     skillsMatched: matched,
     skillsStandout: standout,
 
+    experience,
     salary: salary,
 
     applicantCount,

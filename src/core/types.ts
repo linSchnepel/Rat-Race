@@ -2,6 +2,7 @@
 // Raw card extracted from a LinkedIn listing page
 // ---------------------------------------------------------------------------
 
+import { ExperienceRange } from "../utils/experience.ts";
 import { SalaryRange } from "../utils/salary.ts";
 
 export interface CompanyRecord {
@@ -43,7 +44,6 @@ export interface JobRecord {
   title: string;
   titleNormalized: string;
   employmentType: string | null;
-  experienceLevel: string | null;
 
   // Location
   locationRaw: string;
@@ -69,6 +69,7 @@ export interface JobRecord {
   skillsMatched: string[];
   skillsStandout: string[];
 
+  experience: ExperienceRange | null;
   salary: SalaryRange | null;
 
   // Metrics

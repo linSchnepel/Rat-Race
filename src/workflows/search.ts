@@ -1,9 +1,8 @@
 import { initBrowser, closeBrowser } from '../browser.js';
 import { scrapeGoogleSearch } from '../sources/google.js';
 import { readCompanies, appendCompanies } from '../storage/companyFile.js';
-import { render } from '../cli/render.js';
+import { renderCompanies } from '../cli/render.js';
 import { logger } from '../utils/logger.js';
-import type { CompanyRecord } from '../core/types.js';
 
 export async function runGoogleWorkflow(searchUrls: string[]): Promise<void> {
   if (!searchUrls.length) {
@@ -59,14 +58,4 @@ async function runOnce(searchUrls: string[]): Promise<void> {
 
   const elapsed = ((Date.now() - cycleStart) / 1000).toFixed(1);
   logger.info(`Google cycle complete in ${elapsed}s.`);
-}
-
-// TODO: Move this to logger.ts and add Chalk
-function renderCompanies(companies: CompanyRecord[]): void {
-  logger.info(`\n ${companies.length} new compan${companies.length === 1 ? 'y' : 'ies'} found\n`);
-  for (const c of companies) {
-    logger.info(`  ${c.companyName}`);
-    logger.info(`  ${c.jobBoardUrl}`);
-    logger.info('  ────────────────────────────────────────');
-  }
 }
