@@ -4,8 +4,8 @@ import { readCompanies, appendCompanies } from '../storage/companyFile.js';
 import { renderCompanies } from '../cli/render.js';
 import { logger } from '../utils/logger.js';
 
-export async function runGoogleWorkflow(searchUrls: string[]): Promise<void> {
-  if (!searchUrls.length) {
+export async function runGoogleWorkflow(searchUrls: Map<string, string>): Promise<void> {
+  if (!searchUrls.size) {
     throw new Error('No search URLs provided to runGoogleWorkflow.');
   }
 
@@ -19,7 +19,9 @@ export async function runGoogleWorkflow(searchUrls: string[]): Promise<void> {
 
   try {
     try {
-      await runOnce(searchUrls);
+      for (const [name, url] of searchUrls) {
+        await runOnce(url, name); // TODO: this name/source gets passed around a lot
+      }
     } catch (err) {
       logger.error('Google workflow failed', err);
     }
@@ -29,12 +31,12 @@ export async function runGoogleWorkflow(searchUrls: string[]): Promise<void> {
   }
 }
 
-async function runOnce(searchUrls: string[]): Promise<void> {
+async function runOnce(searchUrl: string, source: string): Promise<void> {
   logger.info('--- Starting Google poll cycle ---');
   const cycleStart = Date.now();
 
-  const found = await scrapeGoogleSearch(searchUrls);
-  logger.info(`Google: found ${found.length} Ashby companies across all searches.`);
+  const found = await scrapeGoogleSearch(searchUrl, source);
+  logger.info(`Google: found ${found.length} companies across all searches.`);
 
   if (found.length === 0) {
     logger.info('No companies found this cycle.');
@@ -43,8 +45,9 @@ async function runOnce(searchUrls: string[]): Promise<void> {
 
   // Dedupe against history
   const history = await readCompanies();
-  const historicUrls = new Set(history.map((c) => c.jobBoardUrl));
-  const fresh = found.filter((c) => !historicUrls.has(c.jobBoardUrl));
+  const historicUrls = new Set(history.map((c) => c.companyName));
+  const fresh = found.filter((c) => !historicUrls.has(c.companyName));
+
   logger.info(`${fresh.length} new companies not seen before.`);
 
   if (fresh.length === 0) {

@@ -6,7 +6,7 @@ import { ExperienceRange } from "../utils/experience.ts";
 import { SalaryRange } from "../utils/salary.ts";
 
 export interface CompanyRecord {
-  source: 'google';
+  source: string;
   companyName: string;
   jobBoardUrl: string;
   firstSeen: string;

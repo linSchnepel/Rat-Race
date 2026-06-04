@@ -21,17 +21,15 @@ const SELECTORS = {
 
 const ASHBY_PATTERN = /^https:\/\/jobs\.ashbyhq\.com\/([^/?#]+)/;
 
-export async function scrapeGoogleSearch(searchUrls: string[]): Promise<CompanyRecord[]> {
+export async function scrapeGoogleSearch(searchUrl: string, source: string): Promise<CompanyRecord[]> {
   const page = await getPage();
   const allCompanies: CompanyRecord[] = [];
 
   try {
-    for (const searchUrl of searchUrls) {
-      logger.info(`Google: searching — ${searchUrl}`);
-      const companies = await scrapeSearchUrl(page, searchUrl);
-      allCompanies.push(...companies);
-      await randomDelay(10_000, 20_000);
-    }
+    logger.info(`Google: searching — ${searchUrl}`);
+    const companies = await scrapeSearchUrl(page, searchUrl, source);
+    allCompanies.push(...companies);
+    await randomDelay(10_000, 20_000);
   } finally {
     await page.close();
   }
@@ -39,7 +37,7 @@ export async function scrapeGoogleSearch(searchUrls: string[]): Promise<CompanyR
   return allCompanies;
 }
 
-async function scrapeSearchUrl(page: Page, searchUrl: string): Promise<CompanyRecord[]> {
+async function scrapeSearchUrl(page: Page, searchUrl: string, source: string): Promise<CompanyRecord[]> {
   const companies: CompanyRecord[] = [];
 
   let currentUrl = searchUrl;
@@ -67,7 +65,7 @@ async function scrapeSearchUrl(page: Page, searchUrl: string): Promise<CompanyRe
     // TODO: scroll
 
     const html = await page.content().catch(() => '');
-    const found = parseSearchResults(html);
+    const found = parseSearchResults(html, source);
     logger.info(`Google page ${pageNum}: found ${found.length} Ashby URLs.`);
     companies.push(...found);
 
@@ -85,7 +83,7 @@ async function scrapeSearchUrl(page: Page, searchUrl: string): Promise<CompanyRe
   return companies;
 }
 
-function parseSearchResults(html: string): CompanyRecord[] {
+function parseSearchResults(html: string, source: string): CompanyRecord[] {
   const $ = load(html);
   const seen = new Set<string>();
   const records: CompanyRecord[] = [];
@@ -115,7 +113,7 @@ function parseSearchResults(html: string): CompanyRecord[] {
     const companyName = decodeSlug(match[1]);
 
     records.push({
-      source: 'google',
+      source: source,
       companyName,
       jobBoardUrl,
       firstSeen: now,

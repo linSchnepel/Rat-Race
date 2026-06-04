@@ -3,12 +3,14 @@ import { existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import type { CompanyRecord } from '../core/types.js';
+import { logger } from '../utils/logger.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COMPANY_FILE = join(__dirname, '../../data/company.jsonl');
 
 export async function readCompanies(): Promise<CompanyRecord[]> {
   if (!existsSync(COMPANY_FILE)) {
+    logger.info('No company file found, starting with empty history.');
     return [];
   }
 
@@ -23,8 +25,9 @@ export async function readCompanies(): Promise<CompanyRecord[]> {
 
     try {
       companies.push(JSON.parse(trimmed) as CompanyRecord);
-    } catch {
-      //
+    } catch (err) {
+      logger.warn('Failed to parse line in company file, skipping:');
+      logger.warn(line);
     }
   }
 
