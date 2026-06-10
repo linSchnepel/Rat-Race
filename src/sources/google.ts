@@ -7,7 +7,7 @@ import type { CompanyRecord } from '../core/types.js';
 
 const SELECTORS = {
   // Each organic search result container
-  resultContainer: 'div.g, div[data-sokoban-container], div[jscontroller] a[href*="ashbyhq.com"]',
+  resultContainer: 'div.g, div[data-sokoban-container], div[jscontroller] a',
 
   // All links on the page
   allLinks: 'a[href]',
@@ -18,8 +18,6 @@ const SELECTORS = {
   // CAPTCHA detection
   captcha: 'form#captcha-form, div.g-recaptcha, input#captcha',
 };
-
-const ASHBY_PATTERN = /^https:\/\/jobs\.ashbyhq\.com\/([^/?#]+)/;
 
 export async function scrapeGoogleSearch(searchUrl: string, source: string): Promise<CompanyRecord[]> {
   const page = await getPage();
@@ -66,7 +64,7 @@ async function scrapeSearchUrl(page: Page, searchUrl: string, source: string): P
 
     const html = await page.content().catch(() => '');
     const found = parseSearchResults(html, source);
-    logger.info(`Google page ${pageNum}: found ${found.length} Ashby URLs.`);
+    logger.info(`Google page ${pageNum}: found ${found.length} URLs.`);
     companies.push(...found);
 
     const nextUrl = getNextPageUrl(html, page.url());
@@ -83,38 +81,49 @@ async function scrapeSearchUrl(page: Page, searchUrl: string, source: string): P
   return companies;
 }
 
+const BOARD_PATTERNS: Record<string, RegExp> = {
+  Ashby:      /https:\/\/jobs\.ashbyhq\.com\/([^/?#]+)/,
+  Greenhouse: /https:\/\/job-boards\.greenhouse\.io\/([^/?#]+)/,
+  Lever:      /https:\/\/jobs\.lever\.co\/([^/?#]+)/,
+};
+
+const BOARD_BASES: Record<string, string> = {
+  Ashby:      'https://jobs.ashbyhq.com',
+  Greenhouse: 'https://job-boards.greenhouse.io',
+  Lever:      'https://jobs.lever.co',
+};
+
 function parseSearchResults(html: string, source: string): CompanyRecord[] {
   const $ = load(html);
   const seen = new Set<string>();
   const records: CompanyRecord[] = [];
   const now = nowIso();
 
+  const pattern = BOARD_PATTERNS[source];
+  const base = BOARD_BASES[source];
+
+  if (!pattern || !base) {
+    logger.warn(`parseSearchResults: unknown source "${source}"`);
+    return [];
+  }
+
   $(SELECTORS.allLinks).each((_i, el) => {
     const raw = $(el).attr('href') ?? '';
     const url = extractUrlFromGoogleHref(raw);
+    if (!url) return;
 
-    if (!url) {
-      return;
-    }
+    const match = pattern.exec(url);
+    if (!match?.[1]) return;
 
-    const match = ASHBY_PATTERN.exec(url);
-    if (!match || !match[1]) {
-      return;
-    }
+    const slug = match[1];
+    const jobBoardUrl = `${base}/${slug}`;
 
-    // Strip trailing path beyond company slug
-    const jobBoardUrl = `https://jobs.ashbyhq.com/${match[1]}`;
-    if (seen.has(jobBoardUrl)) {
-      return;
-    }
-
+    if (seen.has(jobBoardUrl)) return;
     seen.add(jobBoardUrl);
 
-    const companyName = decodeSlug(match[1]);
-
     records.push({
-      source: source,
-      companyName,
+      source,
+      companyName: decodeSlug(slug),
       jobBoardUrl,
       firstSeen: now,
     });
@@ -134,9 +143,7 @@ function extractUrlFromGoogleHref(href: string): string | null {
       return params.get('q');
     }
 
-    if (href.startsWith('https://jobs.ashbyhq.com')) {
-      return href;
-    }
+    return href;
 
     return null;
   } catch {
