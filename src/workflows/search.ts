@@ -2,6 +2,7 @@ import { initBrowser, closeBrowser } from '../browser.js';
 import { scrapeGoogleSearch } from '../sources/google.js';
 import { readCompanies, appendCompanies } from '../storage/companyFile.js';
 import { renderCompanies } from '../cli/render.js';
+import { renderHtmlCompanies } from '../cli/renderHtml.ts'
 import { logger } from '../utils/logger.js';
 
 export async function runGoogleWorkflow(searchUrls: Map<string, string>): Promise<void> {
@@ -55,7 +56,12 @@ async function runOnce(searchUrl: string, source: string): Promise<void> {
     return;
   }
 
-  renderCompanies(fresh);
+  if (process.env.RAT_RACE_ROOT) {
+    renderHtmlCompanies(fresh, process.env.RAT_RACE_ROOT);
+  } else {
+    renderCompanies(fresh);
+  }
+  
   await appendCompanies(fresh);
   logger.info(`Appended ${fresh.length} companies to company.jsonl.`);
 

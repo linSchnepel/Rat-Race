@@ -87,7 +87,7 @@ export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRec
       logger.info(`Page ${pageNum}: ${newCards.length}/${cards.length} cards are new.`);
 
       if (newCards.length === 0) {
-        logger.info('All cards on this page already seen — stopping pagination early.');
+        logger.info('All cards on this page already seen. Stopping pagination early.');
         break;
       }
 
@@ -97,7 +97,7 @@ export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRec
           const job = await hydrateViaPanel(page, card);
           if (job) allJobs.push(job);
         } catch (err) {
-          logger.warn(`Failed to hydrate ${card.externalId}: ${err instanceof Error ? err.message : String(err)}`);
+          logger.warn(`Failed to hydrate LinkedIn ${card.externalId}: ${err instanceof Error ? err.message : String(err)}`);
         }
         await randomDelay(800, 2_000);
       }
@@ -128,7 +128,7 @@ async function scrollJobList(page: Page): Promise<void> {
   const box = await listPanel.boundingBox().catch(() => null);
 
   if (!box) {
-    logger.warn('Could not find scaffold-layout__list bounding box — scroll skipped.');
+    logger.warn('Could not find scaffold-layout__list bounding box. SCROLL SKIPPED.');
     return;
   }
 
@@ -203,7 +203,7 @@ function parseCard($: ReturnType<typeof load>, el: ReturnType<typeof $>[0], fetc
 }
 
 async function hydrateViaPanel(page: Page, card: JobCard): Promise<JobRecord | null> {
-  logger.debug(`Clicking card ${card.externalId} — ${card.title} @ ${card.company}`);
+  logger.debug(`Clicking card ${card.externalId} - ${card.title} @ ${card.company}`);
 
   // Click the card's title link in the left panel
   const cardLocator = page.locator(`li[data-occludable-job-id="${card.externalId}"]`);
@@ -229,10 +229,11 @@ async function hydrateViaPanel(page: Page, card: JobCard): Promise<JobRecord | n
 }
 
 async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord | null> {
+  logger.debug(`Parsing detail pane for ${card.externalId} - ${card.title} @ ${card.company}`);
   const $ = load(html);
 
   const descriptionHtml = $(SELECTORS.detailDescription).html()?.trim() ?? null;
-  const descriptionText = $(SELECTORS.detailDescription).text().replace(/\s+/g, ' ').trim() || null;
+  const descriptionText = $(SELECTORS.detailDescription).text(); //? $(SELECTORS.detailDescription).text().replace(/\s+/g, ' ').trim() : null;
 
   const title   = $(SELECTORS.detailTitle).first().text().trim()   || card.title;
   const company = $(SELECTORS.detailCompany).first().text().trim() || card.company;
@@ -277,6 +278,7 @@ async function parseDetailPane(card: JobCard, html: string): Promise<JobRecord |
   const { matched, standout } = await matchSkills(descriptionText ?? '');
   const now         = nowIso();
   const fingerprint = buildFingerprint({ source: 'linkedin', externalId: card.externalId, company, title });
+  logger.debug(`Hydrated ${card.externalId}: ${title} @ ${company} - matched skills: ${matched.length}, standout skills: ${standout.length}`);
 
   return {
     source: 'linkedin',

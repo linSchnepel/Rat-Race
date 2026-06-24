@@ -1,10 +1,10 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { projectRoot } from '../utils/paths.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const BLACKLIST_FILE = join(__dirname, '../../data/blacklist.json');
+const __dirname = projectRoot;
+const BLACKLIST_FILE = join(__dirname, './data/blacklist.json');
 
 interface Blacklist {
   companies: string[];

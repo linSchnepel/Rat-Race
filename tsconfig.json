@@ -9,7 +9,7 @@
     "strict": true,
     "skipLibCheck": true,
     "rewriteRelativeImportExtensions": true,  // handles .ts → .js on emit
-    // "allowImportingTsExtensions": true,     // REMOVE — blocks emit
+    // "allowImportingTsExtensions": true,     // REMOVE blocks emit
     "forceConsistentCasingInFileNames": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,

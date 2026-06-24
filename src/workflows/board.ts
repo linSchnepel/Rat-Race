@@ -11,12 +11,10 @@ import { filterCards } from '../core/filters.js';
 import { dedupeCards, dedupeJobs, dedupeAgainstHistory } from '../core/dedupe.js';
 import { readJobs, appendJobs } from '../storage/jobsFile.js';
 import { render } from '../cli/render.js';
+import { renderHtml } from '../cli/renderHtml.ts'
 import { logger } from '../utils/logger.js';
 import type { JobCard } from '../core/types.js';
-
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+import { delay } from '../utils/dates.ts';
 
 export async function runLinkedInWorkflow(urls: [string, string]): Promise<void> {
   if (!urls || (urls.length != 2)  ) { // TODO: make this array dynamic
@@ -36,7 +34,7 @@ export async function runLinkedInWorkflow(urls: [string, string]): Promise<void>
 
     try {
       await runOnce(urls[0], 'linkedin');
-      await delay(100000);
+      await delay(1000);
       await runOnce(urls[1], 'linkedin');
     } catch (err) {
       logger.error('LinkedIn poll cycle failed.', err);
@@ -143,7 +141,12 @@ async function runOnce(url: string, type: string): Promise<void> {
     return;
   }
 
-  render(freshJobs);
+  if (process.env.RAT_RACE_ROOT) {
+    renderHtml(freshJobs, process.env.RAT_RACE_ROOT);
+  } else {
+    render(freshJobs);
+  }
+  
   await appendJobs(freshJobs);
   logger.info(`Appended ${freshJobs.length} jobs to jobs.jsonl.`);
 

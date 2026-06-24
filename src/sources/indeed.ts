@@ -166,7 +166,7 @@ async function scrollJobList(page: Page): Promise<void> {
 }
 
 async function hydrateViaPanel(page: Page, card: JobCard, baseUrl: string): Promise<JobRecord | null> {
-  logger.debug(`Indeed: clicking card ${card.externalId} — ${card.title}`);
+  logger.debug(`Indeed: clicking card ${card.externalId} - ${card.title}`);
 
   const cardLocator = page.locator(`a[data-jk="${card.externalId}"]`).first();
   await cardLocator.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});

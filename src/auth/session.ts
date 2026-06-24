@@ -2,9 +2,10 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { join } from 'path';
+import { projectRoot } from '../utils/paths.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SESSION_FILE = join(__dirname, '../../data/state.json');
+const __dirname = projectRoot;
+const SESSION_FILE = join(__dirname, './data/state.json');
 
 export interface SessionState {
   // Unix ms timestamp

@@ -98,7 +98,7 @@ async function verifySession(confirmUrl: string, loginFragment: string): Promise
       throw new Error(`/feed returned HTTP ${response.status()}. The session may be rate-limited or account may be restricted.`);
     }
 
-    logger.debug(`Session OK — landed on: ${finalUrl}`);
+    logger.debug(`Session OK. Landed on: ${finalUrl}`);
   } finally {
     await page.close();
   }

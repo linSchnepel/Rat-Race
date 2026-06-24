@@ -1,12 +1,14 @@
 import 'dotenv/config';
+
 import { chromium } from 'patchright';
 import { mkdir, writeFile } from 'fs/promises';
 import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
 import * as readline from 'readline';
-import { adapters } from './auth/index.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { adapters } from './auth/index.js';
+import { projectRoot } from '../src/utils/paths.js';
+
+const __dirname = projectRoot;
 
 // Usage: npx tsx scripts/setup-auth.ts linkedin
 //        npx tsx scripts/setup-auth.ts indeed
@@ -19,7 +21,7 @@ if (!target) {
 
 const adapter = adapters[target];
 
-const AUTH_FILE = join(__dirname, `../data/auth/${target}.json`);
+const AUTH_FILE = join(__dirname, `./data/auth/${target}.json`);
 
 async function main() {
   if (!adapter) {
@@ -41,7 +43,7 @@ async function main() {
 
   const currentUrl = page.url();
   if (currentUrl.includes('/login') || currentUrl.includes('/authwall')) {
-    console.error('\nStill on login page — complete the login before continuing.');
+    console.error('\nStill on login page - complete the login before continuing.');
     await browser.close();
     process.exit(1);
   }

@@ -1,11 +1,11 @@
-import { readFile, writeFile, appendFile, mkdir } from 'fs/promises';
+import { readFile, appendFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { projectRoot } from '../utils/paths.js';
 import type { JobRecord } from '../core/types.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const JOBS_FILE = join(__dirname, '../../data/jobs.jsonl');
+const __dirname = projectRoot;
+const JOBS_FILE = join(__dirname, './data/jobs.jsonl');
 
 export async function readJobs(): Promise<JobRecord[]> {
   if (!existsSync(JOBS_FILE)) return [];

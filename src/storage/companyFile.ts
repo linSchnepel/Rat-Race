@@ -1,12 +1,12 @@
 import { readFile, appendFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { projectRoot } from '../utils/paths.js';
 import type { CompanyRecord } from '../core/types.js';
 import { logger } from '../utils/logger.ts';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const COMPANY_FILE = join(__dirname, '../../data/company.jsonl');
+const __dirname = projectRoot;
+const COMPANY_FILE = join(__dirname, './data/company.jsonl');
 
 export async function readCompanies(): Promise<CompanyRecord[]> {
   if (!existsSync(COMPANY_FILE)) {

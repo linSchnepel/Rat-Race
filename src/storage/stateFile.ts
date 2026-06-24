@@ -1,10 +1,10 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { projectRoot } from '../utils/paths.js';
 import type { RunState } from '../core/types.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const STATE_FILE = join(__dirname, '../../data/state.json');
+const __dirname = projectRoot;
+const STATE_FILE = join(__dirname, './data/state.json');
 
 const DEFAULT_STATE: RunState = {
   lastRunAt: null,

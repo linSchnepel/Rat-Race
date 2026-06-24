@@ -48,7 +48,7 @@ export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRec
 
   try {
     while (true) {
-      logger.info(`ZipRecruiter: fetching page ${pageNum} — ${currentUrl}`);
+      logger.info(`ZipRecruiter: fetching page ${pageNum} - ${currentUrl}`);
 
       await listPage.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
@@ -108,7 +108,7 @@ async function scrollLeftPane(page: Page): Promise<void> {
   const box = await panel.boundingBox().catch(() => null);
 
   if (!box) {
-    logger.warn('ZipRecruiter: could not find left pane bounding box — scroll skipped.');
+    logger.warn('ZipRecruiter: could not find left pane bounding box - scroll skipped.');
     return;
   }
 
@@ -193,7 +193,7 @@ function parseCard($: ReturnType<typeof load>, el: ReturnType<typeof $>[0], fetc
 }
 
 async function hydrateViaDetailPage(page: Page, card: JobCard, listingUrl: string): Promise<JobRecord | null> {
-  logger.debug(`ZipRecruiter: hydrating ${card.externalId} — ${card.title}`);
+  logger.debug(`ZipRecruiter: hydrating ${card.externalId} - ${card.title}`);
 
   const url = new URL(listingUrl);
   url.searchParams.set('lk', card.externalId);

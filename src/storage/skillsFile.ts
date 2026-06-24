@@ -1,11 +1,11 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { projectRoot } from '../utils/paths.js';
 import type { SkillConfig } from '../core/types.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SKILLS_FILE = join(__dirname, '../../data/skills.json');
+const __dirname = projectRoot;
+const SKILLS_FILE = join(__dirname, './data/skills.json');
 
 const DEFAULT_CONFIG: SkillConfig = { skills: [] };
 

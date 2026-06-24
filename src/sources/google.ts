@@ -24,7 +24,7 @@ export async function scrapeGoogleSearch(searchUrl: string, source: string): Pro
   const allCompanies: CompanyRecord[] = [];
 
   try {
-    logger.info(`Google: searching — ${searchUrl}`);
+    logger.info(`Google: searching - ${searchUrl}`);
     const companies = await scrapeSearchUrl(page, searchUrl, source);
     allCompanies.push(...companies);
     await randomDelay(10_000, 20_000);
@@ -55,7 +55,7 @@ async function scrapeSearchUrl(page: Page, searchUrl: string, source: string): P
     }
 
     if (landedUrl.includes('consent.google.com')) {
-      logger.warn('Google consent page detected — attempting to accept...');
+      logger.warn('Google consent page detected - attempting to accept...');
       await acceptGoogleConsent(page);
       await randomDelay(2_000, 3_000);
     }

@@ -1,9 +1,17 @@
 import chalk from 'chalk';
-import type { CompanyRecord, JobRecord } from '../core/types.js';
-import { formatSalary } from "../utils/salary.ts";
-import { evaluateAlerts } from '../core/alerts.ts';
+import fs from 'fs';
 
-import alerts from "../../data/alerts.json" with { type: "json" };
+import { join } from 'path';
+
+import type { CompanyRecord, JobRecord } from '../core/types.js';
+import { evaluateAlerts } from '../core/alerts.ts';
+import { formatSalary } from "../utils/salary.ts";
+import { projectRoot } from '../utils/paths.js';
+
+const alerts = JSON.parse(
+  fs.readFileSync(join(projectRoot, 'data', 'alerts.json'), 'utf8')
+);
+
 import { sounds } from '../utils/audio.ts';
 
 const DIVIDER = chalk.gray('─'.repeat(72));
@@ -29,7 +37,7 @@ function renderJob(job: JobRecord): void {
   const companyStr = chalk.bold.white(job.company);
   const titleStr = chalk.bold.yellow(job.title);
   const isStandout = highestPriority && highestPriority !== 'newJob' ? true : false;
-  console.log(`${companyStr}  ${chalk.gray('—')}  ${titleStr}` + (isStandout ? chalk.red(' ★') : ''));
+  console.log(`${companyStr}  ${chalk.gray('-')}  ${titleStr}` + (isStandout ? chalk.red(' ★') : ''));
 
   const locationStr = job.isRemote
     ? chalk.green('Remote') + (job.locationRaw ? chalk.gray(` · ${job.locationRaw}`) : '')

@@ -3,10 +3,10 @@ import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { projectRoot } from './utils/paths.js';
 
 export function getAuthFile(source: string): string {
-  return join(__dirname, `../data/auth/${source}.json`);
+  return join(projectRoot, `data/auth/${source}.json`);
 }
 
 let context: BrowserContext | null = null;

@@ -5,7 +5,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "author": "E. Lin Schnepel",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "main.cjs",
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
@@ -20,14 +20,14 @@
     "setup:google": "tsx scripts/setup-auth.ts google"
   },
   "dependencies": {
-    "chalk": "^5.6.2",
-    "cheerio": "^1.2.0",
-    "dotenv": "^17.4.1",
+    "chalk": "5.6.2",
+    "cheerio": "1.2.0",
+    "dotenv": "17.4.1",
     "patchright": "latest",
-    "typescript": "^6.0.3"
+    "typescript": "6.0.3"
   },
   "devDependencies": {
-    "@types/node": "^25.8.0",
-    "tsx": "^4.19.0"
+    "@types/node": "25.8.0",
+    "tsx": "4.19.0"
   }
 }
