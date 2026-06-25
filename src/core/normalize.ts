@@ -1,4 +1,8 @@
 export function normalizeCompany(raw: string): string {
+  if (!raw) {
+    return '';
+  }
+
   return raw
     .toLowerCase()
     .replace(/\b(inc\.?|llc\.?|ltd\.?|corp\.?|co\.?|group|holdings|international|global)\b/g, '')
@@ -8,6 +12,10 @@ export function normalizeCompany(raw: string): string {
 }
 
 export function normalizeTitle(raw: string): string {
+  if (!raw) {
+    return '';
+  }
+
   return raw
     .toLowerCase()
     .replace(/\b(sr\.?|jr\.?|senior|junior|lead|principal|staff|associate|mid[-\s]?level)\b/g, '')
@@ -17,6 +25,10 @@ export function normalizeTitle(raw: string): string {
 }
 
 export function normalizeLocation(raw: string): string {
+  if (!raw) {
+    return '';
+  }
+
   return raw
     .toLowerCase()
     .replace(/\(.*?\)/g, '')
@@ -25,6 +37,7 @@ export function normalizeLocation(raw: string): string {
     .trim();
 }
 
+// Linkedin specific
 export function normalizeUrl(raw: string): string {
   if (!raw) {
     return '';
@@ -38,7 +51,6 @@ export function normalizeUrl(raw: string): string {
       return `https://www.linkedin.com${match[0]}/`;
     }
 
-    // Fallback
     return `${url.origin}${url.pathname}`;
   } catch {
     return raw;
@@ -46,6 +58,10 @@ export function normalizeUrl(raw: string): string {
 }
 
 export function normalizeText(raw: string): string {
+  if (!raw) {
+    return '';
+  }
+
   return raw
     .toLowerCase()
     .replace(/[^\w\s]/g, ' ')

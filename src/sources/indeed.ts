@@ -1,7 +1,7 @@
 import { load } from 'cheerio';
 import type { Page } from 'patchright';
 import { getPage } from '../browser.js';
-import { normalizeCompany, normalizeTitle, normalizeLocation, normalizeUrl } from '../core/normalize.js';
+import { normalizeCompany, normalizeTitle, normalizeLocation } from '../core/normalize.js';
 import { buildFingerprint } from '../core/fingerprint.js';
 import { matchSkills } from '../core/skills.js';
 import { parseSalary } from '../utils/salary.js';

@@ -44,6 +44,9 @@ export function formatSalary(s: SalaryRange): string {
 }
 
 function extractNumbers(text: string): number[] {
+  if (!text) {
+    return [];
+  }
     // Tries to thoroughly clean non-salary numbers
     const cleaned = text.replace(/\b401?/gi, '')
       .replace(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g, '')
@@ -60,11 +63,14 @@ function extractNumbers(text: string): number[] {
     let match: RegExpExecArray | null;
 
     while ((match = pattern.exec(cleaned)) !== null) {
-      const digits = parseFloat(match[1]!.replace(/,/g, ''));
+      const raw = match[1] ? match[1] : '';
+      const digits = Number.parseFloat(raw.replace(/,/g, ""));
+      if (Number.isNaN(digits)) continue;
+
       const multiplier = match[2] ? 1000 : 1;
       const value = digits * multiplier;
 
-      if (value >= 10) {
+      if (Number.isFinite(value) && value >= 10) {
         results.push(value);
       }
     }
