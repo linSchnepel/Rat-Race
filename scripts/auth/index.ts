@@ -13,16 +13,16 @@ export const adapters: Record<string, AuthAdapter> = {
   indeed: {
     name: 'Indeed',
     loginUrl: 'https://secure.indeed.com/account/login',
-    waitForUrl: 'profile**',
+    waitForUrl: '**/account', 
   },
   ziprecruiter: {
     name: 'ZipRecruiter',
     loginUrl: 'https://www.ziprecruiter.com/authn/login',
-    waitForUrl: 'https://www.ziprecruiter.com/jobseeker/home',
+    waitForUrl: '**/home',
   },
   google: {
     name: 'Google',
     loginUrl: 'https://accounts.google.com/signin',
-    waitForUrl: 'https://myaccount.google.com/**',
+    waitForUrl: '**/myaccount.google.com/**',
   },
 };

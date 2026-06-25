@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Rat Race — Login Setup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f0f0f;
+      color: #e0e0e0;
+      padding: 2rem;
+      user-select: none;
+    }
+
+    h1 { font-size: 1.2rem; color: #fff; margin-bottom: 0.25rem; }
+    p.sub { font-size: 0.82rem; color: #666; margin-bottom: 2rem; }
+
+    .platforms { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 2rem; }
+
+    .platform {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.85rem 1rem;
+      border: 1px solid #222;
+      border-radius: 8px;
+      background: #161616;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .platform:has(input:checked) { border-color: #4ade80; }
+    .platform input { accent-color: #4ade80; width: 16px; height: 16px; cursor: pointer; }
+    .platform-name { font-size: 0.95rem; font-weight: 500; }
+    .platform-status { margin-left: auto; font-size: 0.78rem; color: #555; }
+    .platform-status.done { color: #4ade80; }
+    .platform-status.failed { color: #ef4444; }
+    .platform-status.running { color: #facc15; }
+
+    #start-btn {
+      width: 100%;
+      padding: 0.8rem;
+      background: #4ade80;
+      color: #000;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    #start-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #continue-btn {
+      display: none;
+      width: 100%;
+      margin-top: 0.75rem;
+      padding: 0.8rem;
+      background: #1e3a2f;
+      color: #4ade80;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: 1px solid #4ade80;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #status-msg {
+      margin-top: 1rem;
+      font-size: 0.82rem;
+      color: #666;
+      min-height: 1.2rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>Rat Race — Login Setup</h1>
+  <p class="sub">Select the platforms you want to authenticate, then click Start Login.</p>
+
+  <div class="platforms" id="platforms">
+    <label class="platform">
+      <input type="checkbox" value="linkedin" checked />
+      <span class="platform-name">LinkedIn</span>
+      <span class="platform-status" id="status-linkedin"></span>
+    </label>
+    <label class="platform">
+      <input type="checkbox" value="indeed" checked />
+      <span class="platform-name">Indeed</span>
+      <span class="platform-status" id="status-indeed"></span>
+    </label>
+    <label class="platform">
+      <input type="checkbox" value="ziprecruiter" checked />
+      <span class="platform-name">ZipRecruiter</span>
+      <span class="platform-status" id="status-ziprecruiter"></span>
+    </label>
+    <label class="platform">
+      <input type="checkbox" value="google" />
+      <span class="platform-name">Google</span>
+      <span class="platform-status" id="status-google"></span>
+    </label>
+  </div>
+
+  <button id="start-btn">Start Login</button>
+  <button id="continue-btn">✓ Session saved — Continue to next</button>
+  <div id="status-msg"></div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    const startBtn = document.getElementById('start-btn');
+    const continueBtn = document.getElementById('continue-btn');
+    const statusMsg = document.getElementById('status-msg');
+
+    function setStatus(platform, state, text) {
+      const el = document.getElementById(`status-${platform}`);
+      if (!el) return;
+      el.className = `platform-status ${state}`;
+      el.textContent = text;
+    }
+
+    function setMsg(text) {
+      statusMsg.textContent = text;
+    }
+
+    startBtn.addEventListener('click', () => {
+      const selected = [...document.querySelectorAll('input[type=checkbox]:checked')]
+        .map(el => el.value);
+
+      if (selected.length === 0) {
+        setMsg('Select at least one platform.');
+        return;
+      }
+
+      startBtn.disabled = true;
+      document.querySelectorAll('input[type=checkbox]').forEach(el => el.disabled = true);
+      ipcRenderer.send('start-auth', selected);
+    });
+
+    continueBtn.addEventListener('click', () => {
+      continueBtn.style.display = 'none';
+      ipcRenderer.send('continue-auth');
+    });
+
+    ipcRenderer.on('auth-status', (_, { platform, state, message }) => {
+      setStatus(platform, state, message);
+      setMsg('');
+
+      if (state === 'running') {
+        setMsg(`Waiting for ${platform} login in Chrome...`);
+      }
+
+      if (state === 'ready') {
+        setMsg(`Logged in to ${platform} — click Continue to save your session.`);
+        continueBtn.style.display = 'block';
+      }
+
+      if (state === 'done' || state === 'failed') {
+        continueBtn.style.display = 'none';
+      }
+    });
+
+    ipcRenderer.on('auth-complete', () => {
+      setMsg('All done! You can close this window.');
+      startBtn.disabled = false;
+      startBtn.textContent = 'Run Again';
+      startBtn.disabled = false;
+      document.querySelectorAll('input[type=checkbox]').forEach(el => el.disabled = false);
+    });
+  </script>
+</body>
+</html>
