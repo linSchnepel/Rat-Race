@@ -1,33 +1,52 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain } = require('electron');
-const { spawn } = require('child_process');
+const { app, BrowserWindow, ipcMain, Notification } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 const PROJECT_ROOT = __dirname;
+const CONFIG_PATH = path.join(PROJECT_ROOT, 'data', 'config.json');
+
 let win = null;
-let runnerProcess = null;
+let resolveContinue = null; // holds the promise resolver waiting for 'continue-auth'
 
 app.whenReady().then(() => {
   win = new BrowserWindow({
-    width: 420,
-    height: 480,
+    width: 600,
+    height: 680,
     resizable: false,
-    title: 'Rat Race — Login Setup',
+    title: 'Rat Race — Setup',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
     },
   });
 
-  // TODO: change
   win.loadFile(path.join(PROJECT_ROOT, 'login.html'));
   win.on('closed', () => { win = null; });
 });
 
 app.on('window-all-closed', () => app.quit());
 
-// ─── Auth flow ────────────────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────────
+
+ipcMain.handle('load-config', () => {
+  try { return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); }
+  catch { return {}; }
+});
+
+ipcMain.handle('save-config', (_, config) => {
+  try {
+    fs.mkdirSync(path.join(PROJECT_ROOT, 'data'), { recursive: true });
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
+    return true;
+  } catch (err) {
+    console.error('save-config error:', err);
+    return false;
+  }
+});
+
+// ── Auth flow ─────────────────────────────────────────────────────────────────
 
 let queue = [];
 let current = null;
@@ -38,13 +57,19 @@ ipcMain.on('start-auth', (_, platforms) => {
 });
 
 ipcMain.on('continue-auth', () => {
-  if (runnerProcess) {
-    // Signal runner to save and close
-    runnerProcess.stdin.write('\n');
+  if (resolveContinue) {
+    resolveContinue();
+    resolveContinue = null;
   }
 });
 
-function runNext() {
+function waitForContinue() {
+  return new Promise((resolve) => {
+    resolveContinue = resolve;
+  });
+}
+
+async function runNext() {
   if (queue.length === 0) {
     win?.webContents.send('auth-complete');
     return;
@@ -57,71 +82,26 @@ function runNext() {
     message: 'Opening...',
   });
 
-  // Compile first if needed
-  const nodeLocation = require('child_process').execSync('where node', { encoding: 'utf8' }).trim().split('\n')[0].trim();
+  try {
+    process.env.RAT_RACE_ROOT = PROJECT_ROOT;
+    const { runAuth } = await import(require('url').pathToFileURL(
+      path.join(PROJECT_ROOT, 'dist', 'scripts', 'login-runner.js')
+    ).href);
+    await runAuth(current, waitForContinue);
 
-  runnerProcess = spawn(
-    nodeLocation,
-    [
-      path.join(PROJECT_ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs'),
-      path.join(PROJECT_ROOT, 'scripts', 'login-runner.ts'),
-      current,
-    ],
-    {
-      env: { ...process.env, RAT_RACE_ROOT: PROJECT_ROOT },
-      stdio: ['pipe', 'pipe', 'inherit'],
-    }
-  );
-
-  //console.log(runnerProcess);
-
-  runnerProcess.on('error', (err) => {
-    console.error('Spawn error:', err);
-  });
-
-
-console.log(runnerProcess.stdout);
-
-  runnerProcess.stdout.on('data', (data) => {
-    const msg = data.toString().trim();
-
-    if (msg.includes('READY_TO_SAVE')) {
-      win?.webContents.send('auth-status', {
-        platform: current,
-        state: 'ready',
-        message: 'Logged in',
-      });
-    }
-
-    if (msg.includes('SAVE_OK')) {
-      win?.webContents.send('auth-status', {
-        platform: current,
-        state: 'done',
-        message: '✓ Saved',
-      });
-      runnerProcess = null;
-      runNext();
-    }
-
-    if (msg.includes('SAVE_FAILED') || msg.includes('AUTH_FAILED')) {
-      win?.webContents.send('auth-status', {
-        platform: current,
-        state: 'failed',
-        message: '✗ Failed',
-      });
-      runnerProcess = null;
-      runNext();
-    }
-  });
-
-  runnerProcess.on('error', (err) => {
-    console.error('Runner error:', err);
+    win?.webContents.send('auth-status', {
+      platform: current,
+      state: 'done',
+      message: '✓ Saved',
+    });
+  } catch (err) {
+    console.error(`Auth failed for ${current}:`, err);
     win?.webContents.send('auth-status', {
       platform: current,
       state: 'failed',
-      message: '✗ Error',
+      message: '✗ Failed',
     });
-    runnerProcess = null;
-    runNext();
-  });
+  }
+
+  runNext();
 }

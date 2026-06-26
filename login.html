@@ -2,65 +2,73 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Rat Race — Login Setup</title>
+  <title>Rat Race — Setup</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #0f0f0f;
       color: #e0e0e0;
-      padding: 2rem;
       user-select: none;
     }
 
-    h1 { font-size: 1.2rem; color: #fff; margin-bottom: 0.25rem; }
-    p.sub { font-size: 0.82rem; color: #666; margin-bottom: 2rem; }
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #222;
+      background: #111;
+    }
 
-    .platforms { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 2rem; }
+    .tab {
+      padding: 0.85rem 1.5rem;
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: #666;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .tab:hover { color: #aaa; }
+    .tab.active { color: #fff; border-bottom-color: #4ade80; }
+
+    .panel { display: none; padding: 1.5rem; }
+    .panel.active { display: block; }
+
+    /* ── Login tab ── */
+    h1 { font-size: 1.1rem; color: #fff; margin-bottom: 0.25rem; }
+    p.sub { font-size: 0.82rem; color: #666; margin-bottom: 1.5rem; }
+
+    .platforms { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.5rem; }
 
     .platform {
       display: flex;
       align-items: center;
       gap: 0.75rem;
-      padding: 0.85rem 1rem;
+      padding: 0.75rem 1rem;
       border: 1px solid #222;
       border-radius: 8px;
       background: #161616;
       cursor: pointer;
-      transition: border-color 0.15s;
     }
 
     .platform:has(input:checked) { border-color: #4ade80; }
-    .platform input { accent-color: #4ade80; width: 16px; height: 16px; cursor: pointer; }
-    .platform-name { font-size: 0.95rem; font-weight: 500; }
+    .platform input { accent-color: #4ade80; width: 15px; height: 15px; cursor: pointer; }
+    .platform-name { font-size: 0.9rem; font-weight: 500; }
     .platform-status { margin-left: auto; font-size: 0.78rem; color: #555; }
     .platform-status.done { color: #4ade80; }
     .platform-status.failed { color: #ef4444; }
     .platform-status.running { color: #facc15; }
 
-    #start-btn {
-      width: 100%;
-      padding: 0.8rem;
-      background: #4ade80;
-      color: #000;
-      font-size: 0.95rem;
-      font-weight: 600;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-
-    #start-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
     #continue-btn {
       display: none;
       width: 100%;
       margin-top: 0.75rem;
-      padding: 0.8rem;
+      padding: 0.75rem;
       background: #1e3a2f;
       color: #4ade80;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       font-weight: 600;
       border: 1px solid #4ade80;
       border-radius: 8px;
@@ -68,48 +76,250 @@
     }
 
     #status-msg {
-      margin-top: 1rem;
+      margin-top: 0.75rem;
       font-size: 0.82rem;
       color: #666;
       min-height: 1.2rem;
       text-align: center;
     }
+
+    /* ── Settings tab ── */
+    .section {
+      margin-bottom: 1.75rem;
+    }
+
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid #1e1e1e;
+    }
+
+    .section-note {
+      font-size: 0.75rem;
+      color: #555;
+      margin-bottom: 0.75rem;
+    }
+
+    .field { margin-bottom: 0.75rem; }
+
+    .field label {
+      display: block;
+      font-size: 0.78rem;
+      color: #888;
+      margin-bottom: 0.3rem;
+    }
+
+    .field input[type=text],
+    .field select {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      background: #161616;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 0.85rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .field input[type=text]:focus,
+    .field select:focus { border-color: #4ade80; }
+
+    .field input.optional { border-color: #1e1e1e; }
+    .field input.optional:focus { border-color: #4ade80; }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.55rem 0;
+    }
+
+    .toggle-row span { font-size: 0.85rem; color: #aaa; }
+
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+    }
+
+    .toggle input { opacity: 0; width: 0; height: 0; }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #2a2a2a;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      left: 3px;
+      top: 3px;
+      background: #666;
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .toggle input:checked + .toggle-slider { background: #1e3a2f; }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: #4ade80; }
+
+    /* ── Shared buttons ── */
+    .btn-primary {
+      width: 100%;
+      padding: 0.75rem;
+      background: #4ade80;
+      color: #000;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #save-msg {
+      margin-top: 0.75rem;
+      font-size: 0.82rem;
+      color: #4ade80;
+      text-align: center;
+      min-height: 1.2rem;
+    }
   </style>
 </head>
 <body>
-  <h1>Rat Race — Login Setup</h1>
-  <p class="sub">Select the platforms you want to authenticate, then click Start Login.</p>
 
-  <div class="platforms" id="platforms">
-    <label class="platform">
-      <input type="checkbox" value="linkedin" checked />
-      <span class="platform-name">LinkedIn</span>
-      <span class="platform-status" id="status-linkedin"></span>
-    </label>
-    <label class="platform">
-      <input type="checkbox" value="indeed" checked />
-      <span class="platform-name">Indeed</span>
-      <span class="platform-status" id="status-indeed"></span>
-    </label>
-    <label class="platform">
-      <input type="checkbox" value="ziprecruiter" checked />
-      <span class="platform-name">ZipRecruiter</span>
-      <span class="platform-status" id="status-ziprecruiter"></span>
-    </label>
-    <label class="platform">
-      <input type="checkbox" value="google" />
-      <span class="platform-name">Google</span>
-      <span class="platform-status" id="status-google"></span>
-    </label>
+  <div class="tabs">
+    <div class="tab active" data-tab="login">Login</div>
+    <div class="tab" data-tab="settings">Settings</div>
   </div>
 
-  <button id="start-btn">Start Login</button>
-  <button id="continue-btn">✓ Session saved — Continue to next</button>
-  <div id="status-msg"></div>
+  <!-- ── Login panel ── -->
+  <div class="panel active" id="panel-login">
+    <h1>Platform Login</h1>
+    <p class="sub">Select platforms to authenticate, then click Start Login.</p>
+
+    <div class="platforms" id="platforms">
+      <label class="platform">
+        <input type="checkbox" value="linkedin" checked />
+        <span class="platform-name">LinkedIn</span>
+        <span class="platform-status" id="status-linkedin"></span>
+      </label>
+      <label class="platform">
+        <input type="checkbox" value="indeed" checked />
+        <span class="platform-name">Indeed</span>
+        <span class="platform-status" id="status-indeed"></span>
+      </label>
+      <label class="platform">
+        <input type="checkbox" value="ziprecruiter" checked />
+        <span class="platform-name">ZipRecruiter</span>
+        <span class="platform-status" id="status-ziprecruiter"></span>
+      </label>
+    </div>
+
+    <button class="btn-primary" id="start-btn">Start Login</button>
+    <button id="continue-btn">✓ Session saved — Continue to next</button>
+    <div id="status-msg"></div>
+  </div>
+
+  <!-- ── Settings panel ── -->
+  <div class="panel" id="panel-settings">
+
+    <div class="section">
+      <div class="section-title">LinkedIn</div>
+      <div class="field">
+        <label>Search URL 1 — required</label>
+        <input type="text" id="LINKEDIN_SEARCH_URL" placeholder="https://www.linkedin.com/jobs/search/?keywords=..." />
+      </div>
+      <div class="field">
+        <label>Search URL 2 — required</label>
+        <input type="text" id="LINKEDIN_SEARCH_URL_2" placeholder="https://www.linkedin.com/jobs/search/?keywords=..." />
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Indeed</div>
+      <div class="field">
+        <label>Search URL — optional</label>
+        <input type="text" id="INDEED_SEARCH_URL" class="optional" placeholder="https://www.indeed.com/jobs?q=..." />
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">ZipRecruiter</div>
+      <div class="field">
+        <label>Search URL — optional</label>
+        <input type="text" id="ZIPRECRUITER_SEARCH_URL" class="optional" placeholder="https://www.ziprecruiter.com/jobs-search?search=..." />
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Google Jobs</div>
+      <p class="section-note">All three URLs are required for Google Jobs scraping to run.</p>
+      <div class="field">
+        <label>Ashby URL</label>
+        <input type="text" id="ASHBY_SEARCH_URL" placeholder="https://jobs.ashbyhq.com/..." />
+      </div>
+      <div class="field">
+        <label>Greenhouse URL</label>
+        <input type="text" id="GREENHOUSE_SEARCH_URL" placeholder="https://boards.greenhouse.io/..." />
+      </div>
+      <div class="field">
+        <label>Lever URL</label>
+        <input type="text" id="LEVER_SEARCH_URL" placeholder="https://jobs.lever.co/..." />
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Advanced</div>
+      <div class="toggle-row">
+        <span>Headless mode (hide browser window)</span>
+        <label class="toggle">
+          <input type="checkbox" id="HEADLESS" checked />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="field" style="margin-top: 0.75rem;">
+        <label>Log level</label>
+        <select id="LOG_LEVEL">
+          <option value="info">Info</option>
+          <option value="debug">Debug</option>
+          <option value="error">Error only</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="save-btn">Save Settings</button>
+    <div id="save-msg"></div>
+  </div>
 
   <script>
     const { ipcRenderer } = require('electron');
 
+    // ── Tab switching ──────────────────────────────────────────────────────
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+      });
+    });
+
+    // ── Login tab ──────────────────────────────────────────────────────────
     const startBtn = document.getElementById('start-btn');
     const continueBtn = document.getElementById('continue-btn');
     const statusMsg = document.getElementById('status-msg');
@@ -121,21 +331,17 @@
       el.textContent = text;
     }
 
-    function setMsg(text) {
-      statusMsg.textContent = text;
-    }
-
     startBtn.addEventListener('click', () => {
       const selected = [...document.querySelectorAll('input[type=checkbox]:checked')]
+        .filter(el => el.id !== 'HEADLESS')
         .map(el => el.value);
-
       if (selected.length === 0) {
-        setMsg('Select at least one platform.');
+        statusMsg.textContent = 'Select at least one platform.';
         return;
       }
-
       startBtn.disabled = true;
-      document.querySelectorAll('input[type=checkbox]').forEach(el => el.disabled = true);
+      document.querySelectorAll('.platforms input[type=checkbox]')
+        .forEach(el => el.disabled = true);
       ipcRenderer.send('start-auth', selected);
     });
 
@@ -146,28 +352,63 @@
 
     ipcRenderer.on('auth-status', (_, { platform, state, message }) => {
       setStatus(platform, state, message);
-      setMsg('');
-
-      if (state === 'running') {
-        setMsg(`Waiting for ${platform} login in Chrome...`);
-      }
-
+      statusMsg.textContent = '';
+      if (state === 'running') statusMsg.textContent = `Waiting for ${platform} login in Chrome...`;
       if (state === 'ready') {
-        setMsg(`Logged in to ${platform} — click Continue to save your session.`);
+        statusMsg.textContent = `Logged in to ${platform} — click Continue to save your session.`;
         continueBtn.style.display = 'block';
       }
-
-      if (state === 'done' || state === 'failed') {
-        continueBtn.style.display = 'none';
-      }
+      if (state === 'done' || state === 'failed') continueBtn.style.display = 'none';
     });
 
     ipcRenderer.on('auth-complete', () => {
-      setMsg('All done! You can close this window.');
+      statusMsg.textContent = 'All done! You can close this window.';
       startBtn.disabled = false;
       startBtn.textContent = 'Run Again';
-      startBtn.disabled = false;
-      document.querySelectorAll('input[type=checkbox]').forEach(el => el.disabled = false);
+      document.querySelectorAll('.platforms input[type=checkbox]')
+        .forEach(el => el.disabled = false);
+    });
+
+    // ── Settings tab ───────────────────────────────────────────────────────
+    const fields = [
+      'LINKEDIN_SEARCH_URL', 'LINKEDIN_SEARCH_URL_2',
+      'INDEED_SEARCH_URL', 'ZIPRECRUITER_SEARCH_URL',
+      'ASHBY_SEARCH_URL', 'GREENHOUSE_SEARCH_URL', 'LEVER_SEARCH_URL',
+      'LOG_LEVEL',
+      //'TZ', TODO: We don't have timezones
+    ];
+
+    // Load existing config on startup
+    ipcRenderer.invoke('load-config').then(config => {
+      if (!config) return;
+      fields.forEach(key => {
+        const el = document.getElementById(key);
+        if (el && config[key] !== undefined) el.value = config[key];
+      });
+      if (config.HEADLESS !== undefined) {
+        document.getElementById('HEADLESS').checked = config.HEADLESS;
+      }
+    });
+
+    document.getElementById('save-btn').addEventListener('click', () => {
+      const config = {};
+      fields.forEach(key => {
+        const el = document.getElementById(key);
+        if (el) config[key] = el.value.trim();
+      });
+      config.HEADLESS = document.getElementById('HEADLESS').checked;
+
+      ipcRenderer.invoke('save-config', config).then(ok => {
+        const msg = document.getElementById('save-msg');
+        if (ok) {
+          msg.textContent = '✓ Settings saved.';
+          msg.style.color = '#4ade80';
+        } else {
+          msg.textContent = '✗ Failed to save. Check with your developer.';
+          msg.style.color = '#ef4444';
+        }
+        setTimeout(() => msg.textContent = '', 3000);
+      });
     });
   </script>
 </body>

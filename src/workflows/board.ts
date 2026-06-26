@@ -11,10 +11,13 @@ import { filterCards } from '../core/filters.js';
 import { dedupeCards, dedupeJobs, dedupeAgainstHistory } from '../core/dedupe.js';
 import { readJobs, appendJobs } from '../storage/jobsFile.js';
 import { render } from '../cli/render.js';
-import { renderHtml } from '../cli/renderHtml.ts'
+import { appendJobs as appendHtml } from '../cli/renderHtml.ts'
 import { logger } from '../utils/logger.js';
 import type { JobCard } from '../core/types.js';
 import { delay } from '../utils/dates.ts';
+import { loadConfig } from '../utils/config.ts';
+
+const config = loadConfig();
 
 export async function runLinkedInWorkflow(urls: [string, string]): Promise<void> {
   if (!urls || (urls.length != 2)  ) { // TODO: make this array dynamic
@@ -24,8 +27,8 @@ export async function runLinkedInWorkflow(urls: [string, string]): Promise<void>
   logger.info('Starting LinkedIn job scout…');
 
   await initBrowser({
-    headless: process.env['HEADLESS'] !== 'false',
-    timezone: process.env['TZ'] ?? 'America/Chicago',
+    headless: config.HEADLESS !== false,
+    timezone: config.TZ ?? 'America/Chicago',
     source: 'linkedin'
   });
 
@@ -79,8 +82,8 @@ export async function runZiprecruiterWorkflow(url: string): Promise<void> {
   logger.info('Starting Ziprecruiter job scout…');
 
   await initBrowser({
-    headless: process.env['HEADLESS'] !== 'false',
-    timezone: process.env['TZ'] ?? 'America/Chicago',
+    headless: config.HEADLESS !== false,
+    timezone: config.TZ ?? 'America/Chicago',
     source: 'ziprecruiter'});
 
   try {
@@ -142,7 +145,7 @@ async function runOnce(url: string, type: string): Promise<void> {
   }
 
   if (process.env.RAT_RACE_ROOT) {
-    renderHtml(freshJobs, process.env.RAT_RACE_ROOT);
+    appendHtml(freshJobs);
   } else {
     render(freshJobs);
   }

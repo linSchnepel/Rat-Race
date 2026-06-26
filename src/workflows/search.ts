@@ -2,19 +2,21 @@ import { initBrowser, closeBrowser } from '../browser.js';
 import { scrapeGoogleSearch } from '../sources/google.js';
 import { readCompanies, appendCompanies } from '../storage/companyFile.js';
 import { renderCompanies } from '../cli/render.js';
-import { renderHtmlCompanies } from '../cli/renderHtml.ts'
+import { appendCompanies as appendHtml } from '../cli/renderHtml.ts'
 import { logger } from '../utils/logger.js';
+import { loadConfig } from '../utils/config.ts';
 
 export async function runGoogleWorkflow(searchUrls: Map<string, string>): Promise<void> {
   if (!searchUrls.size) {
     throw new Error('No search URLs provided to runGoogleWorkflow.');
   }
 
+  const config = loadConfig();
   logger.info('Starting Google search workflow…');
 
   await initBrowser({
-    headless: process.env['HEADLESS'] !== 'false',
-    timezone: process.env['TZ'] ?? 'America/Chicago',
+    headless: config.HEADLESS !== false,
+    timezone: config.TZ ?? 'America/Chicago',
     source: 'google',
   });
 
@@ -57,7 +59,7 @@ async function runOnce(searchUrl: string, source: string): Promise<void> {
   }
 
   if (process.env.RAT_RACE_ROOT) {
-    renderHtmlCompanies(fresh, process.env.RAT_RACE_ROOT);
+    appendHtml(fresh);
   } else {
     renderCompanies(fresh);
   }

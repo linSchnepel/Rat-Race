@@ -1,5 +1,7 @@
 {
   "rules": [
-    { "name": "Any new job",       "sound": "newJob",     "minSalary": null, "titleContains": null,  "minStandoutSkills": 0 }
+    { "name": "Any new job", "sound": "newJob", "minSalary": null, "titleContains": null,  "minStandoutSkills": 0 },
+    { "name": "Junior", "sound": "noticeMe", "minSalary": null, "titleContains": "junior|jr|associate|entry",  "minStandoutSkills": 0 },
+    { "name": "Possible", "sound": "noticeMe", "minSalary": null, "titleContains": null,  "minStandoutSkills": 2 }
   ]
 }

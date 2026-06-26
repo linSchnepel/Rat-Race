@@ -2,7 +2,7 @@ import chalk from 'chalk';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-const LOG_LEVEL: LogLevel = (process.env['LOG_LEVEL'] as LogLevel | undefined) ?? 'info';
+const LOG_LEVEL: LogLevel = (process.env['LOG_LEVEL'] as LogLevel | undefined) ?? 'error';
 
 const LEVELS: Record<LogLevel, number> = {
   debug: 0,
