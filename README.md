@@ -135,8 +135,6 @@ To see an example or acquire a skills file for software roles, go to the reposit
 }
 ```
 
-Add or remove skills to match your background. [See a full example here](#).
-
 ### `blacklist.json` - Companies and Titles to Ignore
 
 Rat Race will skip any job that matches a blacklisted company name or job title.
