@@ -37,7 +37,7 @@ export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRec
   let pageNum = 1;
 
   try {
-    //while (true) { // TODO: For now, cannot get past page 1 without triggering Indeed's anti-bot measures.
+    while (true && currentUrl) { // Multi-page may trigger Indeed's anti-bot measures.
       logger.info(`Indeed: fetching page ${pageNum}…`);
       await page.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
@@ -79,7 +79,7 @@ export async function fetchAndHydrateAllCards(searchUrl: string): Promise<JobRec
       currentUrl = nextUrl;
       pageNum++;
       await randomDelay(15_000, 35_000); // longer delay between pages to avoid rate limits
-    //}
+    }
   } finally {
     await page.close();
   }

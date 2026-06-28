@@ -15,6 +15,7 @@ const config = loadConfig();
 
 async function runGoogle() {
   if (!config.ASHBY_SEARCH_URL || !config.GREENHOUSE_SEARCH_URL || !config.LEVER_SEARCH_URL) {
+    logger.warn('No websearch URLs found.')
     return;
   }
 
@@ -64,3 +65,5 @@ export async function run() {
     process.exit(1);
   }
 }
+
+await run();

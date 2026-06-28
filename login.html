@@ -285,13 +285,6 @@
 
     <div class="section">
       <div class="section-title">Advanced</div>
-      <div class="toggle-row">
-        <span>Headless mode (hide browser window)</span>
-        <label class="toggle">
-          <input type="checkbox" id="HEADLESS" checked />
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
       <div class="field" style="margin-top: 0.75rem;">
         <label>Log level</label>
         <select id="LOG_LEVEL">
@@ -333,7 +326,6 @@
 
     startBtn.addEventListener('click', () => {
       const selected = [...document.querySelectorAll('input[type=checkbox]:checked')]
-        .filter(el => el.id !== 'HEADLESS')
         .map(el => el.value);
       if (selected.length === 0) {
         statusMsg.textContent = 'Select at least one platform.';
@@ -385,9 +377,6 @@
         const el = document.getElementById(key);
         if (el && config[key] !== undefined) el.value = config[key];
       });
-      if (config.HEADLESS !== undefined) {
-        document.getElementById('HEADLESS').checked = config.HEADLESS;
-      }
     });
 
     document.getElementById('save-btn').addEventListener('click', () => {
@@ -396,7 +385,6 @@
         const el = document.getElementById(key);
         if (el) config[key] = el.value.trim();
       });
-      config.HEADLESS = document.getElementById('HEADLESS').checked;
 
       ipcRenderer.invoke('save-config', config).then(ok => {
         const msg = document.getElementById('save-msg');

@@ -27,7 +27,6 @@ export async function runLinkedInWorkflow(urls: [string, string]): Promise<void>
   logger.info('Starting LinkedIn job scout…');
 
   await initBrowser({
-    headless: config.HEADLESS !== false,
     timezone: config.TZ ?? 'America/Chicago',
     source: 'linkedin'
   });
@@ -56,8 +55,7 @@ export async function runIndeedWorkflow(url: string): Promise<void> {
   logger.info('Starting Indeed job scout…');
 
   await initBrowser({
-    headless: false,
-    timezone: process.env['TZ'] ?? 'America/Chicago',
+    timezone: config.TZ ?? 'America/Chicago',
     source: 'indeed'});
 
   try {
@@ -82,7 +80,6 @@ export async function runZiprecruiterWorkflow(url: string): Promise<void> {
   logger.info('Starting Ziprecruiter job scout…');
 
   await initBrowser({
-    headless: config.HEADLESS !== false,
     timezone: config.TZ ?? 'America/Chicago',
     source: 'ziprecruiter'});
 

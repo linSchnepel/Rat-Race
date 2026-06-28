@@ -1,0 +1,32 @@
+appId: com.ratrace.jobfinder
+productName: Rat Race
+copyright: Copyright © 2026
+
+extraMetadata:
+  main: main.cjs
+
+directories:
+  output: release/jobfinder
+
+win:
+  icon: rat-race.ico
+  target:
+    - target: dir
+      arch: x64
+
+files:
+  - main.cjs
+  - rat-race.ico
+  - dist/**/*
+  - dist/src/**/*
+  - node_modules/**/*
+  - "!node_modules/.cache/**/*"
+  - "!node_modules/.bin/**/*"
+  - "!node_modules/tsx/**/*"
+  - "!**/*.ts"
+  - "!**/*.map"
+  - "!**/*.md"
+
+extraResources:
+  - from: browsers
+    to: browsers

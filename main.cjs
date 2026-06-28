@@ -4,7 +4,9 @@ const { app, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-const PROJECT_ROOT = __dirname;
+const PROJECT_ROOT = app.isPackaged
+  ? path.join(path.dirname(process.execPath), '..')
+  : __dirname;
 const LAST_RUN_PATH = path.join(PROJECT_ROOT, 'data', 'last_run.json');
 
 app.whenReady().then(async () => {
@@ -19,8 +21,11 @@ async function maybeRunScraper() {
 
   try {
     const lastRun = JSON.parse(fs.readFileSync(LAST_RUN_PATH, 'utf8'));
-    if (lastRun.date === today && lastRun.status === 'success') {
-      console.log('Already ran successfully today, exiting.');
+    const lastRunTime = new Date(lastRun.completedAt ? `${lastRun.date}T${lastRun.completedAt}` : lastRun.date);
+    const hoursSince = (Date.now() - lastRunTime.getTime()) / (1000 * 60 * 60);
+
+    if (hoursSince < 3 && lastRun.status === 'success') { //TODO: config?
+      console.log('Ran less than 3 hours ago, exiting.');
       app.quit();
       return;
     }
@@ -35,10 +40,9 @@ async function runScraper() {
   try {
     process.env.RAT_RACE_ROOT = PROJECT_ROOT;
     const { run } = await import(require('url').pathToFileURL(
-      path.join(PROJECT_ROOT, 'dist', 'src', 'index.js')
+      path.join(__dirname, 'dist', 'src', 'index.js')
     ).href);
     await run();
-    console.log('1');
     notify('Rat Race', "Job finder complete. Check today's results.");
   } catch (err) {
     console.error('Scraper error:', err);

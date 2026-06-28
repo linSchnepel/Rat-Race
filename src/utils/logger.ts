@@ -2,7 +2,9 @@ import chalk from 'chalk';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-const LOG_LEVEL: LogLevel = (process.env['LOG_LEVEL'] as LogLevel | undefined) ?? 'error';
+import { loadConfig } from '../utils/config.ts';
+const config = loadConfig();
+const LOG_LEVEL: LogLevel = (config.LOG_LEVEL as LogLevel | undefined) ?? 'error';
 
 const LEVELS: Record<LogLevel, number> = {
   debug: 0,

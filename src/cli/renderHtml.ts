@@ -6,20 +6,32 @@ import { evaluateAlerts } from '../core/alerts.js';
 import { projectRoot } from '../utils/paths.js';
 import { readFileSync as rfs } from 'fs';
 
-const alertsData = JSON.parse(
-  rfs(join(projectRoot, 'data', 'alerts.json'), 'utf8')
-);
+function getAlertsData() {
+  return JSON.parse(
+    rfs(join(projectRoot, 'data', 'alerts.json'), 'utf8')
+  );
+}
 
 function getOutputPath(mode: 'jobs' | 'companies'): string {
   const today = new Date().toISOString().slice(0, 10);
   const outDir = join(projectRoot, 'data', 'pages');
   mkdirSync(outDir, { recursive: true });
-  return join(outDir, `${mode}_${today}.html`);
+
+  const base = join(outDir, `${mode}_${today}`);
+  if (!existsSync(`${base}.html`)) return `${base}.html`;
+
+  let i = 2;
+  while (existsSync(`${base}-${i}.html`)) i++;
+  return `${base}-${i}.html`;
 }
 
 // ── Setup ────────────────────────────────────────────────────────────────────
 
 export function setupPage(mode: 'jobs' | 'companies'): void {
+  if (!process.env.RAT_RACE_ROOT) {
+    return;
+  }
+  
   const outPath = getOutputPath(mode);
   const today = new Date().toISOString().slice(0, 10);
 
@@ -167,7 +179,8 @@ function insertBeforeMain(filePath: string, html: string): void {
 }
 
 function jobCard(job: JobRecord): string {
-  const triggered = evaluateAlerts(job, alertsData.rules);
+  const alerts = getAlertsData();
+  const triggered = evaluateAlerts(job, alerts.rules);
   const highestPriority = triggered.at(-1);
   const isStandout = !!highestPriority && highestPriority !== 'newJob';
 

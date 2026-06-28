@@ -71,9 +71,6 @@ function renderJob(job: JobRecord): void {
   }
 
   console.log(`  ${chalk.underline.gray(job.url)}`);
-  // TODO: requires modern OSC 8. Must switch to windows terminal.
-  // const osc8Link = `\x1b]8;;${job.url}\x1b\\${job.url}\x1b]8;;\x1b\\`;
-  // console.log(`  ${chalk.cyan(osc8Link)}`);
 
   console.log(DIVIDER);
 }

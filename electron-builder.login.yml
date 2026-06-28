@@ -1,0 +1,33 @@
+appId: com.ratrace.login
+productName: Rat Race Login
+copyright: Copyright © 2026
+
+extraMetadata:
+  main: login-main.cjs
+
+directories:
+  output: release/login
+
+win:
+  icon: rat-race.ico
+  target:
+    - target: dir
+      arch: x64
+
+files:
+  - login-main.cjs
+  - login.html
+  - rat-race.ico
+  - dist/scripts/**/*
+  - dist/src/**/*
+  - node_modules/**/*
+  - "!node_modules/.cache/**/*"
+  - "!node_modules/.bin/**/*"
+  - "!node_modules/tsx/**/*"
+  - "!**/*.ts"
+  - "!**/*.map"
+  - "!**/*.md"
+
+extraResources:
+  - from: browsers
+    to: browsers

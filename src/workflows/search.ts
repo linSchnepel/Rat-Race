@@ -15,7 +15,6 @@ export async function runGoogleWorkflow(searchUrls: Map<string, string>): Promis
   logger.info('Starting Google search workflow…');
 
   await initBrowser({
-    headless: config.HEADLESS !== false,
     timezone: config.TZ ?? 'America/Chicago',
     source: 'google',
   });

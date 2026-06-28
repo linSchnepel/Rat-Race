@@ -4,7 +4,9 @@ const { app, BrowserWindow, ipcMain, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-const PROJECT_ROOT = __dirname;
+const PROJECT_ROOT = app.isPackaged
+  ? path.join(path.dirname(process.execPath), '..')
+  : __dirname;
 const CONFIG_PATH = path.join(PROJECT_ROOT, 'data', 'config.json');
 
 let win = null;
@@ -22,7 +24,7 @@ app.whenReady().then(() => {
     },
   });
 
-  win.loadFile(path.join(PROJECT_ROOT, 'login.html'));
+  win.loadFile(path.join(__dirname, 'login.html'));
   win.on('closed', () => { win = null; });
 });
 
@@ -85,9 +87,17 @@ async function runNext() {
   try {
     process.env.RAT_RACE_ROOT = PROJECT_ROOT;
     const { runAuth } = await import(require('url').pathToFileURL(
-      path.join(PROJECT_ROOT, 'dist', 'scripts', 'login-runner.js')
+      path.join(__dirname, 'dist', 'scripts', 'login-runner.js')
     ).href);
-    await runAuth(current, waitForContinue);
+
+    const onReady = () => {
+      win?.webContents.send('auth-status', {
+        platform: current,
+        state: 'ready',
+        message: 'Logged in',
+      });
+    };
+    await runAuth(current, onReady, waitForContinue);
 
     win?.webContents.send('auth-status', {
       platform: current,

@@ -11,7 +11,6 @@ interface Config {
   ASHBY_SEARCH_URL?: string;
   GREENHOUSE_SEARCH_URL?: string;
   LEVER_SEARCH_URL?: string;
-  HEADLESS?: boolean;
   LOG_LEVEL?: string;
   TZ?: string;
 }
