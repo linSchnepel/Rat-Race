@@ -1,4 +1,4 @@
-# Rat Race — User Guide
+# Rat Race
 
 ## What It Does
 
@@ -125,7 +125,7 @@ Inside `rat-race/data/` you'll find three files you can edit to fine-tune what R
 ### `skills.json` - Your Skills
 
 Lists the skills Rat Race looks for in job listings. Matching skills are highlighted in the results. Standout skills are highlighted in red.
-To see an example or acquire a skills file for software roles, go to the repository's data/skills_SOFTWARE_ENGINEER.json file.
+To see an example or acquire a skills file for software roles, go to the repository's [data/skills_SOFTWARE_ENGINEER.json](https://github.com/linSchnepel/Rat-Race/blob/main/data/skills_SOFTWARE_ENGINEER.json) file.
 
 ```json
 {
