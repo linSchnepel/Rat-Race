@@ -45,9 +45,31 @@ async function runScraper() {
     await run();
     notify('Rat Race', "Job finder complete. Check today's results.");
   } catch (err) {
-    console.error('Scraper error:', err);
+    writeLog(`Scraper error: ${err instanceof Error ? err.stack : String(err)}`);
     notify('Rat Race', 'Something went wrong. Check with your developer.');
   }
+}
+
+process.on('uncaughtException', (err) => {
+  writeLog(`Uncaught exception: ${err.stack}`);
+  notify('Rat Race', 'Something went wrong. Check with your developer.');
+});
+
+process.on('unhandledRejection', (reason) => {
+  writeLog(`Unhandled rejection: ${reason instanceof Error ? reason.stack : String(reason)}`);
+  notify('Rat Race', 'Something went wrong. Check with your developer.');
+});
+
+function writeLog(msg) {
+  try {
+    const logDir = path.join(PROJECT_ROOT, 'logs');
+    require('fs').mkdirSync(logDir, { recursive: true });
+    require('fs').appendFileSync(
+      path.join(logDir, 'rat-race.log'),
+      `[${new Date().toISOString()}] ${msg}\n`,
+      'utf8'
+    );
+  } catch {}
 }
 
 function notify(title, body) {

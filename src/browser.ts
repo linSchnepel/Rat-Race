@@ -36,7 +36,7 @@ export async function initBrowser(opts: BrowserOptions & { source?: string } = {
 
   const authFile = getAuthFile(opts.source ?? 'linkedin');
 
-  if (!existsSync(authFile)) {
+  if (!existsSync(authFile) && opts.source != 'google') {
     throw new Error(`Auth file not found at ${authFile}.`);
   }
 
@@ -51,7 +51,7 @@ export async function initBrowser(opts: BrowserOptions & { source?: string } = {
   });
 
   context = await browser.newContext({
-    storageState: authFile,
+    storageState: opts.source != 'google' ? authFile : { cookies: [], origins: [] },
     viewport: { width: 1440, height: 900 },
     locale: opts.locale ?? 'en-US',
     timezoneId: opts.timezone ?? 'America/Chicago',

@@ -17,7 +17,7 @@ app.whenReady().then(() => {
     width: 600,
     height: 680,
     resizable: false,
-    title: 'Rat Race — Setup',
+    title: 'Rat Race - Setup',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,

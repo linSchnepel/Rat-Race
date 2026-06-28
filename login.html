@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Rat Race — Setup</title>
+  <title>Rat Race - Setup</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -231,7 +231,7 @@
     </div>
 
     <button class="btn-primary" id="start-btn">Start Login</button>
-    <button id="continue-btn">✓ Session saved — Continue to next</button>
+    <button id="continue-btn">✓ Session saved - Continue to next</button>
     <div id="status-msg"></div>
   </div>
 
@@ -241,11 +241,11 @@
     <div class="section">
       <div class="section-title">LinkedIn</div>
       <div class="field">
-        <label>Search URL 1 — required</label>
+        <label>Search URL 1 - required</label>
         <input type="text" id="LINKEDIN_SEARCH_URL" placeholder="https://www.linkedin.com/jobs/search/?keywords=..." />
       </div>
       <div class="field">
-        <label>Search URL 2 — required</label>
+        <label>Search URL 2 - required</label>
         <input type="text" id="LINKEDIN_SEARCH_URL_2" placeholder="https://www.linkedin.com/jobs/search/?keywords=..." />
       </div>
     </div>
@@ -253,7 +253,7 @@
     <div class="section">
       <div class="section-title">Indeed</div>
       <div class="field">
-        <label>Search URL — optional</label>
+        <label>Search URL - optional</label>
         <input type="text" id="INDEED_SEARCH_URL" class="optional" placeholder="https://www.indeed.com/jobs?q=..." />
       </div>
     </div>
@@ -261,7 +261,7 @@
     <div class="section">
       <div class="section-title">ZipRecruiter</div>
       <div class="field">
-        <label>Search URL — optional</label>
+        <label>Search URL - optional</label>
         <input type="text" id="ZIPRECRUITER_SEARCH_URL" class="optional" placeholder="https://www.ziprecruiter.com/jobs-search?search=..." />
       </div>
     </div>
@@ -288,9 +288,9 @@
       <div class="field" style="margin-top: 0.75rem;">
         <label>Log level</label>
         <select id="LOG_LEVEL">
-          <option value="info">Info</option>
-          <option value="debug">Debug</option>
           <option value="error">Error only</option>
+          <option value="debug">Debug</option>
+          <option value="info">Info</option>
         </select>
       </div>
     </div>
@@ -347,7 +347,7 @@
       statusMsg.textContent = '';
       if (state === 'running') statusMsg.textContent = `Waiting for ${platform} login in Chrome...`;
       if (state === 'ready') {
-        statusMsg.textContent = `Logged in to ${platform} — click Continue to save your session.`;
+        statusMsg.textContent = `Logged in to ${platform} - click Continue to save your session.`;
         continueBtn.style.display = 'block';
       }
       if (state === 'done' || state === 'failed') continueBtn.style.display = 'none';

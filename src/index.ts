@@ -47,7 +47,7 @@ export async function run() {
       logger.info('no old data found');
     }
     
-    //await runGoogle();
+    await runGoogle();
     await runBoardsSimple();
 
     writeFileSync(
@@ -65,5 +65,3 @@ export async function run() {
     process.exit(1);
   }
 }
-
-await run();

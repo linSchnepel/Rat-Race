@@ -12,17 +12,19 @@ function getAlertsData() {
   );
 }
 
-function getOutputPath(mode: 'jobs' | 'companies'): string {
+function getOutputPath(mode: 'jobs' | 'companies', fileAlreadyCreated: boolean): string {
   const today = new Date().toISOString().slice(0, 10);
   const outDir = join(projectRoot, 'data', 'pages');
   mkdirSync(outDir, { recursive: true });
 
   const base = join(outDir, `${mode}_${today}`);
-  if (!existsSync(`${base}.html`)) return `${base}.html`;
-
-  let i = 2;
-  while (existsSync(`${base}-${i}.html`)) i++;
-  return `${base}-${i}.html`;
+  if (!existsSync(`${base}.html`) || fileAlreadyCreated) {
+    return `${base}.html`;
+  } else {
+    let i = 1;
+    while (existsSync(`${base}-${i}.html`)) i++;
+    return `${base}-${i}.html`;
+  }
 }
 
 // ── Setup ────────────────────────────────────────────────────────────────────
@@ -32,12 +34,12 @@ export function setupPage(mode: 'jobs' | 'companies'): void {
     return;
   }
   
-  const outPath = getOutputPath(mode);
+  const outPath = getOutputPath(mode, false);
   const today = new Date().toISOString().slice(0, 10);
 
   const title = mode === 'jobs'
-    ? 'Rat Race — Jobs'
-    : 'Rat Race — Companies';
+    ? 'Rat Race - Jobs'
+    : 'Rat Race - Companies';
 
   const accentColor = mode === 'jobs' ? '#facc15' : '#22d3ee';
 
@@ -46,7 +48,7 @@ export function setupPage(mode: 'jobs' | 'companies'): void {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${title} — ${today}</title>
+  <title>${title} - ${today}</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -132,7 +134,7 @@ export function setupPage(mode: 'jobs' | 'companies'): void {
 <body>
   <header>
     <h1>${title}</h1>
-    <span class="date">${today} — <span id="count">0</span> ${mode === 'jobs' ? 'jobs' : 'companies'}</span>
+    <span class="date">${today} - <span id="count">0</span> ${mode === 'jobs' ? 'jobs' : 'companies'}</span>
   </header>
   <main></main>
   <script>
@@ -151,7 +153,7 @@ export function setupPage(mode: 'jobs' | 'companies'): void {
 export function appendJobs(jobs: JobRecord[]): void {
   if (jobs.length === 0) return;
 
-  const outPath = getOutputPath('jobs');
+  const outPath = getOutputPath('jobs', true);
   if (!existsSync(outPath)) setupPage('jobs');
 
   const cards = jobs.map(jobCard).join('\n');
@@ -163,7 +165,7 @@ export function appendJobs(jobs: JobRecord[]): void {
 export function appendCompanies(companies: CompanyRecord[]): void {
   if (companies.length === 0) return;
 
-  const outPath = getOutputPath('companies');
+  const outPath = getOutputPath('companies', true);
   if (!existsSync(outPath)) setupPage('companies');
 
   const cards = companies.map(companyCard).join('\n');
@@ -207,7 +209,7 @@ function jobCard(job: JobRecord): string {
   <div class="job${isStandout ? ' standout' : ''}">
     <div class="job-header">
       <span class="job-company">${esc(job.company)}</span>
-      <span class="job-sep">—</span>
+      <span class="job-sep">-</span>
       <span class="job-title">${esc(job.title)}</span>
       ${isStandout ? '<span class="star">★</span>' : ''}
     </div>
